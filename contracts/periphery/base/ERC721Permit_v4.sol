@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {ERC721} from "solmate/src/tokens/ERC721.sol";
 import {EIP712_v4} from "./EIP712_v4.sol";
 import {ERC721PermitHash} from "../libraries/ERC721PermitHash.sol";
-import {SignatureVerification} from "permit2/src/libraries/SignatureVerification.sol";
+import {SignatureVerification} from "../utils/permit2/libraries/SignatureVerification.sol";
 
 import {IERC721Permit_v4} from "../interfaces/IERC721Permit_v4.sol";
 import {UnorderedNonce} from "./UnorderedNonce.sol";

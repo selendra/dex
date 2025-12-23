@@ -6,13 +6,24 @@ module.exports = {
   solidity: {
     compilers: [
       {
+        version: "0.8.17",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1
+          },
+          evmVersion: "istanbul",
+          viaIR: true
+        }
+      },
+      {
         version: "0.8.20",
         settings: {
           optimizer: {
             enabled: true,
             runs: 1  // Optimize for smallest deployment size
           },
-          evmVersion: "cancun",
+          evmVersion: "shanghai",
           viaIR: true
         }
       },
@@ -23,7 +34,7 @@ module.exports = {
             enabled: true,
             runs: 1
           },
-          evmVersion: "cancun",
+          evmVersion: "shanghai",
           viaIR: true
         }
       },

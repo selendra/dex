@@ -9,7 +9,6 @@ import {SafeCast} from "../core/libraries/SafeCast.sol";
 import {Position} from "../core/libraries/Position.sol";
 import {StateLibrary} from "../core/libraries/StateLibrary.sol";
 import {TransientStateLibrary} from "../core/libraries/TransientStateLibrary.sol";
-import {IAllowanceTransfer} from "permit2/src/interfaces/IAllowanceTransfer.sol";
 import {TickMath} from "../core/libraries/TickMath.sol";
 import {ModifyLiquidityParams, SwapParams} from "../core/types/PoolOperation.sol";
 
@@ -30,6 +29,7 @@ import {PositionInfo, PositionInfoLibrary} from "./libraries/PositionInfoLibrary
 import {LiquidityAmounts} from "./libraries/LiquidityAmounts.sol";
 import {NativeWrapper} from "./base/NativeWrapper.sol";
 import {IWETH9} from "./interfaces/external/IWETH9.sol";
+import {IAllowanceTransfer} from "./utils/permit2/interfaces/IAllowanceTransfer.sol";
 
 /// @notice The PositionManager (PosM) contract is responsible for creating liquidity positions on v4.
 /// PosM mints and manages ERC721 tokens associated with each position.
