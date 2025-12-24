@@ -1,0 +1,17 @@
+node_modules/
+logs/
+*.log
+.env
+.env.local
+.env.*.local
+dist/
+build/
+coverage/
+.DS_Store
+*.pem
+*.key
+*.crt
+.vscode/
+.idea/
+pm2.log
+.pm2/

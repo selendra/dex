@@ -31,3 +31,4 @@ yarn-error.log*
 
 # Gas reports
 gas-report.txt
+.local
