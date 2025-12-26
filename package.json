@@ -6,8 +6,11 @@
   "scripts": {
     "test": "hardhat test",
     "compile": "hardhat compile",
-    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
-    "deploy:testnet": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:local": "hardhat run scripts/deploy/deploy.js --network localhost",
+    "deploy:testnet": "hardhat run scripts/deploy/deploy.js --network sepolia",
+    "deploy:tokens": "node scripts/deploy/deploy-4-test-tokens.js",
+    "deploy:routers": "node scripts/deploy/deploy-test-routers.js",
+    "test:workflow": "node scripts/test/test-complete-workflow.js",
     "node": "hardhat node",
     "clean": "hardhat clean"
   },
