@@ -306,6 +306,140 @@ class ContractService {
   async getNetwork() {
     return await this.provider.getNetwork();
   }
+
+  // ============================================
+  // PHASE 2 - TRADING FEATURES
+  // ============================================
+
+  async executeSwap({ poolKey, zeroForOne, amountSpecified, sqrtPriceLimitX96 }) {
+    try {
+      const swapRouterAbi = [
+        'function swap(address poolManager, (address,address,uint24,int24,address) calldata key, bool zeroForOne, int256 amountSpecified, uint160 sqrtPriceLimitX96) external returns (int256, int256)'
+      ];
+      const swapRouter = new ethers.Contract(
+        process.env.SWAP_ROUTER_ADDRESS,
+        swapRouterAbi,
+        this.wallet
+      );
+
+      const poolKeyTuple = [
+        poolKey.currency0,
+        poolKey.currency1,
+        poolKey.fee,
+        poolKey.tickSpacing,
+        poolKey.hooks
+      ];
+
+      const tx = await swapRouter.swap(
+        process.env.POOL_MANAGER_ADDRESS,
+        poolKeyTuple,
+        zeroForOne,
+        amountSpecified,
+        sqrtPriceLimitX96
+      );
+
+      const receipt = await tx.wait();
+      const poolId = this.calculatePoolId(poolKeyTuple);
+
+      return {
+        txHash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        gasUsed: Number(receipt.gasUsed),
+        poolId,
+        note: 'Swap executed successfully'
+      };
+    } catch (error) {
+      throw new Error(`Swap failed: ${error.message}`);
+    }
+  }
+
+  async addLiquidity({ poolKey, tickLower, tickUpper, liquidityDelta }) {
+    try {
+      const liquidityManagerAbi = [
+        'function addLiquidity(address poolManager, (address,address,uint24,int24,address) calldata key, int24 tickLower, int24 tickUpper, uint256 liquidityDelta) external returns (uint256)'
+      ];
+      const liquidityManager = new ethers.Contract(
+        process.env.LIQUIDITY_ROUTER_ADDRESS,
+        liquidityManagerAbi,
+        this.wallet
+      );
+
+      const poolKeyTuple = [
+        poolKey.currency0,
+        poolKey.currency1,
+        poolKey.fee,
+        poolKey.tickSpacing,
+        poolKey.hooks
+      ];
+
+      const tx = await liquidityManager.addLiquidity(
+        process.env.POOL_MANAGER_ADDRESS,
+        poolKeyTuple,
+        tickLower,
+        tickUpper,
+        liquidityDelta
+      );
+
+      const receipt = await tx.wait();
+      const poolId = this.calculatePoolId(poolKeyTuple);
+
+      return {
+        txHash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        gasUsed: Number(receipt.gasUsed),
+        poolId,
+        liquidityAdded: liquidityDelta,
+        tickLower,
+        tickUpper
+      };
+    } catch (error) {
+      throw new Error(`Add liquidity failed: ${error.message}`);
+    }
+  }
+
+  async removeLiquidity({ poolKey, tickLower, tickUpper, liquidityDelta }) {
+    try {
+      const liquidityManagerAbi = [
+        'function removeLiquidity(address poolManager, (address,address,uint24,int24,address) calldata key, int24 tickLower, int24 tickUpper, uint256 liquidityDelta) external returns (uint256)'
+      ];
+      const liquidityManager = new ethers.Contract(
+        process.env.LIQUIDITY_ROUTER_ADDRESS,
+        liquidityManagerAbi,
+        this.wallet
+      );
+
+      const poolKeyTuple = [
+        poolKey.currency0,
+        poolKey.currency1,
+        poolKey.fee,
+        poolKey.tickSpacing,
+        poolKey.hooks
+      ];
+
+      const tx = await liquidityManager.removeLiquidity(
+        process.env.POOL_MANAGER_ADDRESS,
+        poolKeyTuple,
+        tickLower,
+        tickUpper,
+        liquidityDelta
+      );
+
+      const receipt = await tx.wait();
+      const poolId = this.calculatePoolId(poolKeyTuple);
+
+      return {
+        txHash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        gasUsed: Number(receipt.gasUsed),
+        poolId,
+        liquidityRemoved: liquidityDelta,
+        tickLower,
+        tickUpper
+      };
+    } catch (error) {
+      throw new Error(`Remove liquidity failed: ${error.message}`);
+    }
+  }
 }
 
 module.exports = new ContractService();
