@@ -11,8 +11,7 @@ const poolsRoute = require('./routes/pools');
 const tokensRoute = require('./routes/tokens');
 const utilsRoute = require('./routes/utils');
 const swapsRoute = require('./routes/swaps');
-const liquidityRoute = require('./routes/liquidity');const swapRoutes = require('./routes/swaps');
-const liquidityRoutes = require('./routes/liquidity');
+const liquidityRoute = require('./routes/liquidity');
 const app = express();
 const PORT = process.env.PORT || 3000;
 

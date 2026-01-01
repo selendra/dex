@@ -5,10 +5,14 @@ const contractService = require('../services/contractService');
 // POST /liquidity/add - Add liquidity to a pool
 router.post('/add', async (req, res) => {
   try {
-    const { token0, token1, fee, tickLower, tickUpper, liquidityDelta } = req.body;
+    const { token0, token1, token0Address, token1Address, fee, tickLower, tickUpper, liquidityDelta, amount0Desired, amount1Desired, amount0Min, amount1Min, deadline } = req.body;
+
+    // Accept both token0/token1 or token0Address/token1Address
+    const t0 = token0 || token0Address;
+    const t1 = token1 || token1Address;
 
     // Validation
-    if (!token0 || !token1) {
+    if (!t0 || !t1) {
       return res.status(400).json({
         success: false,
         error: 'token0 and token1 are required'
@@ -22,22 +26,12 @@ router.post('/add', async (req, res) => {
       });
     }
 
-    if (tickLower === undefined || tickUpper === undefined) {
-      return res.status(400).json({
-        success: false,
-        error: 'tickLower and tickUpper are required'
-      });
-    }
-
-    if (!liquidityDelta) {
-      return res.status(400).json({
-        success: false,
-        error: 'liquidityDelta is required'
-      });
-    }
+    // Use default ticks if not provided (-887220 to 887220 = full range)
+    const finalTickLower = tickLower !== undefined ? tickLower : -887220;
+    const finalTickUpper = tickUpper !== undefined ? tickUpper : 887220;
 
     // Validate tick range
-    if (tickLower >= tickUpper) {
+    if (finalTickLower >= finalTickUpper) {
       return res.status(400).json({
         success: false,
         error: 'tickLower must be less than tickUpper'
@@ -45,15 +39,20 @@ router.post('/add', async (req, res) => {
     }
 
     // Build poolKey
-    const poolKeyData = contractService.encodePoolKey(token0, token1, fee);
+    const poolKeyData = contractService.encodePoolKey(t0, t1, fee);
     const poolKey = poolKeyData.poolKey;
 
-    // Add liquidity
+    // Add liquidity (includes token transfers)
     const result = await contractService.addLiquidity({
       poolKey,
-      tickLower,
-      tickUpper,
-      liquidityDelta
+      tickLower: finalTickLower,
+      tickUpper: finalTickUpper,
+      liquidityDelta: liquidityDelta || "100000000000000000000", // Default 100 tokens
+      amount0Desired: amount0Desired,
+      amount1Desired: amount1Desired,
+      amount0Min: amount0Min,
+      amount1Min: amount1Min,
+      deadline: deadline
     });
 
     res.json({

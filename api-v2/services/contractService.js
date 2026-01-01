@@ -17,6 +17,7 @@ const ABIS = {
     'function totalSupply() view returns (uint256)',
     'function balanceOf(address) view returns (uint256)',
     'function approve(address spender, uint256 amount) returns (bool)',
+    'function transfer(address to, uint256 amount) returns (bool)',
   ],
   TestToken: [
     'constructor(string name, string symbol, uint256 initialSupply)',
@@ -40,6 +41,13 @@ class ContractService {
       ABIS.StateView,
       this.provider
     );
+  }
+
+  // Get a fresh wallet instance (avoids nonce caching issues)
+  getFreshWallet() {
+    const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, this.provider);
+    // Wrap wallet in NonceManager to automatically manage nonces
+    return new ethers.NonceManager(wallet);
   }
 
   // ============================================================
@@ -313,14 +321,28 @@ class ContractService {
 
   async executeSwap({ poolKey, zeroForOne, amountSpecified, sqrtPriceLimitX96 }) {
     try {
+      // Use fresh wallet with NonceManager
+      const freshWallet = this.getFreshWallet();
+      
+      // PreFundedSwapRouter requires tokens transferred to router before swap
       const swapRouterAbi = [
-        'function swap(address poolManager, (address,address,uint24,int24,address) calldata key, bool zeroForOne, int256 amountSpecified, uint160 sqrtPriceLimitX96) external returns (int256, int256)'
+        'function swap((address,address,uint24,int24,address), (bool,int256,uint160), address) external returns (int256)'
       ];
       const swapRouter = new ethers.Contract(
         process.env.SWAP_ROUTER_ADDRESS,
         swapRouterAbi,
-        this.wallet
+        freshWallet
       );
+
+      // Fix sqrtPriceLimitX96 if it's 0 or invalid
+      // MIN_SQRT_PRICE = 4295128739
+      // MAX_SQRT_PRICE = 1461446703485210103287273052203988822378723970342
+      if (!sqrtPriceLimitX96 || sqrtPriceLimitX96 === "0" || BigInt(sqrtPriceLimitX96) === 0n) {
+        // Use reasonable limits based on swap direction
+        sqrtPriceLimitX96 = zeroForOne 
+          ? "4295128740"  // MIN_SQRT_PRICE + 1 (price goes down)
+          : "1461446703485210103287273052203988822378723970341"; // MAX_SQRT_PRICE - 1 (price goes up)
+      }
 
       const poolKeyTuple = [
         poolKey.currency0,
@@ -330,14 +352,30 @@ class ContractService {
         poolKey.hooks
       ];
 
-      const tx = await swapRouter.swap(
-        process.env.POOL_MANAGER_ADDRESS,
-        poolKeyTuple,
+      const swapParamsTuple = [
         zeroForOne,
         amountSpecified,
         sqrtPriceLimitX96
-      );
+      ];
 
+      // Determine input amount and transfer tokens to router
+      // Negative amountSpecified = exactInput (we're selling this amount)
+      // Positive amountSpecified = exactOutput (we need to estimate max input)
+      const isExactInput = BigInt(amountSpecified) < 0n;
+      const transferAmount = isExactInput 
+        ? -BigInt(amountSpecified) * 11n / 10n  // Add 10% buffer for exactInput
+        : BigInt(amountSpecified) * 15n / 10n; // Add 50% buffer for exactOutput
+      
+      // Transfer input token to router (pre-fund pattern)
+      const inputCurrency = zeroForOne ? poolKey.currency0 : poolKey.currency1;
+      const inputToken = new ethers.Contract(inputCurrency, ABIS.ERC20, freshWallet);
+      
+      const transferTx = await inputToken.transfer(process.env.SWAP_ROUTER_ADDRESS, transferAmount);
+      await transferTx.wait();
+
+      // Execute swap (router pulls tokens from itself, sends output to user)
+      const recipientAddress = await freshWallet.getAddress();
+      const tx = await swapRouter.swap(poolKeyTuple, swapParamsTuple, recipientAddress);
       const receipt = await tx.wait();
       const poolId = this.calculatePoolId(poolKeyTuple);
 
@@ -346,6 +384,7 @@ class ContractService {
         blockNumber: receipt.blockNumber,
         gasUsed: Number(receipt.gasUsed),
         poolId,
+        inputAmountTransferred: transferAmount.toString(),
         note: 'Swap executed successfully'
       };
     } catch (error) {
@@ -353,15 +392,18 @@ class ContractService {
     }
   }
 
-  async addLiquidity({ poolKey, tickLower, tickUpper, liquidityDelta }) {
+  async addLiquidity({ poolKey, tickLower, tickUpper, liquidityDelta, amount0Desired, amount1Desired }) {
     try {
+      // Use a single fresh wallet for all transactions in this operation
+      const freshWallet = this.getFreshWallet();
+      
       const liquidityManagerAbi = [
-        'function addLiquidity(address poolManager, (address,address,uint24,int24,address) calldata key, int24 tickLower, int24 tickUpper, uint256 liquidityDelta) external returns (uint256)'
+        'function addLiquidity((address,address,uint24,int24,address) calldata key, int24 tickLower, int24 tickUpper, int256 liquidityDelta) external returns (int128, int128)'
       ];
       const liquidityManager = new ethers.Contract(
         process.env.LIQUIDITY_ROUTER_ADDRESS,
         liquidityManagerAbi,
-        this.wallet
+        freshWallet
       );
 
       const poolKeyTuple = [
@@ -372,8 +414,31 @@ class ContractService {
         poolKey.hooks
       ];
 
+      // Transfer tokens to liquidity manager first (SimpleLiquidityManager requirement)
+      const token0Contract = new ethers.Contract(
+        poolKey.currency0,
+        ABIS.ERC20,
+        freshWallet
+      );
+      const token1Contract = new ethers.Contract(
+        poolKey.currency1,
+        ABIS.ERC20,
+        freshWallet
+      );
+
+      // Use provided amounts or estimate based on liquidity delta
+      const transferAmount0 = amount0Desired || liquidityDelta;
+      const transferAmount1 = amount1Desired || liquidityDelta;
+
+      // Transfer tokens to liquidity manager
+      let transferTx = await token0Contract.transfer(process.env.LIQUIDITY_ROUTER_ADDRESS, transferAmount0);
+      await transferTx.wait();
+      
+      transferTx = await token1Contract.transfer(process.env.LIQUIDITY_ROUTER_ADDRESS, transferAmount1);
+      await transferTx.wait();
+
+      // Now add liquidity
       const tx = await liquidityManager.addLiquidity(
-        process.env.POOL_MANAGER_ADDRESS,
         poolKeyTuple,
         tickLower,
         tickUpper,
@@ -390,7 +455,9 @@ class ContractService {
         poolId,
         liquidityAdded: liquidityDelta,
         tickLower,
-        tickUpper
+        tickUpper,
+        amount0Transferred: transferAmount0.toString(),
+        amount1Transferred: transferAmount1.toString()
       };
     } catch (error) {
       throw new Error(`Add liquidity failed: ${error.message}`);
