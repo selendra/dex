@@ -9,7 +9,9 @@
     "deploy:local": "hardhat run scripts/deploy/deploy.js --network localhost",
     "deploy:tokens": "hardhat run scripts/deploy/deploy-tokens.js --network localhost",
     "node": "hardhat node",
-    "clean": "hardhat clean"
+    "clean": "hardhat clean",
+    "api": "node api/index.js",
+    "dev": "node api/index.js"
   },
   "author": "",
   "license": "MIT",
@@ -29,11 +31,8 @@
   "dependencies": {
     "@openzeppelin/contracts": "^5.4.0",
     "@uniswap/permit2-sdk": "^1.0.0",
-    "body-parser": "^2.2.1",
-    "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "ethers": "^6.9.0",
-    "express": "^5.2.1",
     "solmate": "^6.2.0"
   }
 }
