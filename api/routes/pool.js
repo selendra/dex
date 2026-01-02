@@ -1,0 +1,143 @@
+const express = require('express');
+const router = express.Router();
+const blockchainService = require('../services/blockchain');
+
+/**
+ * POST /api/pool/initialize
+ * Initialize a new pool
+ * Body: {
+ *   token0: "0x...",
+ *   token1: "0x...",
+ *   sqrtPriceX96: "79228162514264337593543950336" (optional, defaults to 1:1)
+ * }
+ */
+router.post('/initialize', async (req, res, next) => {
+  try {
+    const { token0, token1, sqrtPriceX96 } = req.body;
+    
+    // Validate input
+    if (!token0 || !token1) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['token0', 'token1']
+      });
+    }
+    
+    // Initialize pool
+    const result = await blockchainService.initializePool(
+      token0,
+      token1,
+      sqrtPriceX96 || null
+    );
+    
+    res.json({
+      success: true,
+      message: 'Pool initialized successfully',
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/pool/:token0/:token1
+ * Get pool information
+ */
+router.get('/:token0/:token1', async (req, res, next) => {
+  try {
+    const { token0, token1 } = req.params;
+    
+    const poolInfo = await blockchainService.getPoolInfo(token0, token1);
+    
+    res.json({
+      success: true,
+      data: poolInfo
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/pool/list
+ * Get information for multiple pools
+ * Body: {
+ *   tokens: ["0x...", "0x...", "0x..."]
+ * }
+ */
+router.post('/list', async (req, res, next) => {
+  try {
+    const { tokens } = req.body;
+    
+    if (!tokens || !Array.isArray(tokens) || tokens.length < 2) {
+      return res.status(400).json({
+        error: 'Invalid tokens array',
+        required: 'Array of at least 2 token addresses'
+      });
+    }
+    
+    const pools = await blockchainService.getAllPoolsInfo(tokens);
+    
+    res.json({
+      success: true,
+      data: {
+        pools,
+        count: pools.length
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/pool/token/:tokenAddress/balance
+ * Get token balance for default signer
+ */
+router.get('/token/:tokenAddress/balance', async (req, res, next) => {
+  try {
+    const { tokenAddress } = req.params;
+    
+    const balance = await blockchainService.getTokenBalance(tokenAddress, null);
+    
+    res.json({
+      success: true,
+      data: {
+        tokenAddress,
+        accountAddress: 'default signer',
+        balance
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/pool/token/:tokenAddress/balance/:accountAddress
+ * Get token balance for specific account
+ */
+router.get('/token/:tokenAddress/balance/:accountAddress', async (req, res, next) => {
+  try {
+    const { tokenAddress, accountAddress } = req.params;
+    
+    const balance = await blockchainService.getTokenBalance(
+      tokenAddress,
+      accountAddress
+    );
+    
+    res.json({
+      success: true,
+      data: {
+        tokenAddress,
+        accountAddress,
+        balance
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+module.exports = router;

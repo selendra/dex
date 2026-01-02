@@ -1,124 +1,138 @@
 # DEX Project - AI Agent Instructions
 
 ## Project Overview
-This is a Uniswap V4-based DEX with smart contracts (Solidity) and a REST API (Node.js/Express) for liquidity management and token swaps. The project runs on Hardhat local network (chainId 1337).
+Uniswap V4-based DEX implementation with custom smart contracts for liquidity management and token swaps. Pure Solidity/Hardhat project with no backend API layer. Runs on Hardhat local network (chainId 1337).
 
 ## Architecture
 
-### Two-Layer Design
-1. **Smart Contracts** (`/contracts`): Uniswap V4 core (PoolManager, PositionManager, SwapRouter)
-2. **REST API** (`/api`): Express server that interacts with deployed contracts via ethers.js
+### Contract Structure
+1. **Core Contracts** (`contracts/core/`): Uniswap V4 PoolManager, ERC6909, libraries
+2. **Periphery** (`contracts/periphery/`): PositionManager, V4Router, StateView, lenses
+3. **Custom Contracts** (root): SimpleLiquidityManager, WorkingSwapRouter, TestToken
+4. **V4 Source** (`.local/`): Vendored v4-core and v4-periphery repositories
 
 ### Critical Concepts
 
-**PoolKey Structure**: Every pool operation requires a PoolKey tuple with 5 fields:
-```javascript
-{
-  currency0: "0x...",  // Lower address (auto-sorted)
-  currency1: "0x...",  // Higher address  
-  fee: 3000,           // 500, 3000, or 10000 (basis points)
-  tickSpacing: 60,     // Must match fee tier
-  hooks: ethers.ZeroAddress  // No hooks enabled
+**PoolKey Structure**: Every pool operation requires a PoolKey struct with 5 fields:
+```solidity
+struct PoolKey {
+  Currency currency0;    // Lower address (auto-sorted)
+  Currency currency1;    // Higher address  
+  uint24 fee;            // 500, 3000, or 10000 (basis points)
+  int24 tickSpacing;     // 1, 60, or 200 (must match fee tier)
+  IHooks hooks;          // address(0) for no hooks
 }
 ```
 
-**PoolId Calculation**: PoolId = keccak256(abi.encode(PoolKey)). See `api/services/contractService.js:65-70` for implementation.
+**PoolId Calculation**: `PoolId.toId(poolKey)` = `keccak256(abi.encode(poolKey))`. See [contracts/core/types/PoolId.sol](contracts/core/types/PoolId.sol).
 
-**Tick Ranges**: Full-range liquidity uses ticks `-887220` to `887220`. Price calculations use `sqrtPriceX96` format.
+**Tick Ranges**: Full-range liquidity uses ticks `-887220` to `887220`. Prices use `sqrtPriceX96` (Q64.96 fixed-point).
 
 ## Development Workflows
 
-### Start Full Stack (Local Development)
+### Local Development Setup
 ```bash
 # Terminal 1: Start Hardhat node
 npm run node
 
 # Terminal 2: Deploy contracts
-npm run deploy:local
-
-# Terminal 3: Start API server
-cd api && npm start
+npm run deploy:local        # Deploy core contracts
+npm run deploy:tokens       # Deploy 4 test tokens
+npm run deploy:routers      # Deploy SimpleLiquidityManager + WorkingSwapRouter
 ```
 
 ### Contract Development
 ```bash
 npm run compile       # Compile with viaIR optimization
-npm test             # Run contract tests
-npm run clean        # Clean artifacts
+npm test             # Run Hardhat tests (if present)
+npm run clean        # Clean artifacts and cache
 ```
 
-**Solidity Version**: Multi-compiler setup (0.8.17, 0.8.20, 0.8.24, 0.8.26) with `viaIR: true` and `runs: 1` for minimal deployment size. See [hardhat.config.js](hardhat.config.js#L5-L45).
+**Solidity Versions**: Multi-compiler setup (0.8.17, 0.8.20, 0.8.24, 0.8.26) with `viaIR: true` and `runs: 1` for minimal bytecode size. Required for Uniswap V4. See [hardhat.config.js](hardhat.config.js#L5-L45).
 
-### API Testing
+### Testing Workflows
 ```bash
-cd api
-npm test             # Run automated API tests
-npm run verify       # Verify contract deployment
-curl http://localhost:3000/health  # Quick health check
+npm run test:workflow    # Run complete end-to-end test
+# Note: scripts/ directory may need to be created for custom test scripts
 ```
 
 ## Key Files & Patterns
 
-### Contract Service (`api/services/contractService.js`)
-- **ABIs**: Simplified inline ABIs (lines 4-35) - only essential methods included
-- **Provider Setup**: Single signer wallet from `PRIVATE_KEY` env var
-- **Token Sorting**: Always sort `currency0 < currency1` before creating PoolKey
-- **Error Handling**: Wrap contract calls with try-catch and descriptive messages
+### Custom Routers Pattern
+Both [SimpleLiquidityManager.sol](contracts/SimpleLiquidityManager.sol) and [WorkingSwapRouter.sol](contracts/WorkingSwapRouter.sol) follow the same pattern:
 
-### Pool Initialization (`scripts/initialize-pool.js`)
-Use `sqrtPriceX96 = "79228162514264337593543950336"` for 1:1 initial price ratio.
+1. Implement `IUnlockCallback` interface
+2. Call `poolManager.unlock(data)` with encoded parameters
+3. In `unlockCallback`, execute pool operations (`modifyLiquidity` or `swap`)
+4. Settle debts using `poolManager.sync()` + `poolManager.settle()` for negative deltas
+5. Take claims using `poolManager.take()` for positive deltas
 
-### Routes Structure (`api/routes/`)
-All endpoints follow standardized response format:
-```javascript
-{
-  success: true,
-  data: { /* endpoint-specific data */ },
-  meta: { timestamp: new Date().toISOString() }
+**Critical**: Tokens must be transferred to router contract BEFORE calling operations. Uses "CurrencySettler" pattern from v4-core tests.
+
+### Pool Initialization
+Use `sqrtPriceX96 = 79228162514264337593543950336` for 1:1 initial price (2^96).
+
+### Swap Parameters  
+```solidity
+SwapParams {
+  bool zeroForOne;           // true = token0->token1
+  int256 amountSpecified;    // negative = exactIn, positive = exactOut
+  uint160 sqrtPriceLimitX96; // min/max acceptable price
 }
 ```
 
+Price limits prevent excessive slippage:
+- For `zeroForOne=true`: `4295128740` (MIN_PRICE + 1)
+- For `zeroForOne=false`: `1461446703485210103287273052203988822378723970342` (MAX_PRICE - 1)
+
 ## Environment Configuration
 
-**Contract Addresses** (from `api/.env`):
-- PoolManager: `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`
-- PositionManager: `0x5FC8d32690cc91D4c39d9d3abcBD16989F875707`  
-- SwapRouter: `0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB`
-- StateView: `0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9`
+**Deployed Addresses** (from `.env` after running `npm run deploy:local`):
+- PoolManager: `0x5FbDB2315678afecb367f032d93F642f64180aa3`
+- StateView: `0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0`
+- SimpleLiquidityManager: `0x0B306BF915C4d645ff596e518fAf3F9669b97016`
+- WorkingSwapRouter: `0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1`
 
-**Default Test Account**: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266` (first Hardhat account)
+**Test Tokens** (from `.env` after `npm run deploy:tokens`):
+- TOKENS (stable): `0xa513E6E4b8f2a923D98304ec87F64353C4D5C853`
+- TOKENA (10:1): `0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6`
+- TOKENB (20:1): `0x8A791620dd6260079BF849Dc5567aDC3F2FdC318`  
+- TOKENC (1:1): `0x610178dA211FEF7D417bC0e6FeD39F05609AD788`
 
-## Common Patterns
+**Default Test Account**: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266` (first Hardhat account, private key in `.env`)
 
-### Adding New API Endpoint
-1. Create route handler in `api/routes/`
-2. Use ContractService methods for blockchain interaction
-3. Validate input parameters (addresses, amounts, deadlines)
-4. Return standardized JSON response
-5. Add error handling with descriptive messages
+## Common Development Patterns
 
-### Working with Liquidity
-- **Quote first**: Use `/api/liquidity/add/quote` to calculate amounts before executing
-- **Deadline**: Unix timestamp, typically `Math.floor(Date.now()/1000) + 300` (5 min)
-- **Slippage**: Add 10% buffer (`amount * 1.1`) to max amounts
+### Adding Liquidity Flow
+1. Deploy tokens or use existing test tokens
+2. Initialize pool with `poolManager.initialize(poolKey, sqrtPriceX96)`
+3. Transfer tokens to SimpleLiquidityManager contract
+4. Call `liquidityManager.addLiquidity(poolKey, tickLower, tickUpper, liquidityDelta)`
+5. Contract handles unlock callback, settles deltas automatically
 
-### Token Approvals
-ERC20 tokens must be approved before operations:
-```javascript
-await token.approve(positionManagerAddress, amount);
-```
+### Executing Swaps Flow
+1. Transfer input tokens to WorkingSwapRouter contract
+2. Call `swapRouter.swap(poolKey, swapParams)`
+3. Contract executes swap in unlock callback
+4. Output tokens transferred back to sender
+
+### Working with Deployment Scripts
+The project uses npm scripts defined in package.json for deployment:
+- `npm run deploy:local` - Deploy core contracts (PoolManager, StateView, etc.)
+- `npm run deploy:tokens` - Deploy 4 test tokens with specific price ratios
+- `npm run deploy:routers` - Deploy SimpleLiquidityManager and WorkingSwapRouter
 
 ## Project-Specific Conventions
 
-- **No TypeScript**: Pure JavaScript for simplicity
-- **Minimal ABIs**: Only include methods actually used in API
-- **Single Network**: Development focused on local Hardhat network
-- **No Frontend**: API-only architecture, designed for integration
-- **Comprehensive Docs**: All major operations documented in `/docs` and `/api/USAGE_EXAMPLES.md`
+- **No TypeScript**: Pure JavaScript for deployment scripts, Solidity for contracts
+- **No Backend API**: Direct smart contract interaction only, no Express server
+- **Single Network**: Development focused on Hardhat local network (chainId 1337)
+- **Pre-funding Pattern**: Tokens transferred to router contracts before operations (no approvals needed)
+- **Minimal Artifacts**: Compiled contracts exist, but some source files may only be in artifacts/
+- **V4 Dependencies**: Uniswap V4 contracts copied to `.local/` directories for compilation compatibility
 
 ## Documentation References
 
-- API endpoints: [api/README.md](api/README.md)
-- Quick reference: [API_QUICK_REFERENCE.md](API_QUICK_REFERENCE.md)
-- Deployment info: [DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md)
-- Usage examples: [api/USAGE_EXAMPLES.md](api/USAGE_EXAMPLES.md)
+- Project plan: [DEX_API_PLAN.md](DEX_API_PLAN.md) (historical - describes future API layer)
+- Main README: [README.md](README.md)
+- Configuration: [hardhat.config.js](hardhat.config.js), [.env](.env.example)
