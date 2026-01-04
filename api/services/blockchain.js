@@ -1,4 +1,6 @@
-const { ethers } = require('hardhat');
+const ethers = require('ethers');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 class BlockchainService {
@@ -23,9 +25,16 @@ class BlockchainService {
 
   async initialize() {
     try {
-      // Get signer (use first account)
-      const [signer] = await ethers.getSigners();
-      this.signer = signer;
+      // Connect to localhost network explicitly
+      const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
+      
+      // Get signer using private key from .env
+      if (!process.env.PRIVATE_KEY) {
+        throw new Error('PRIVATE_KEY not found in .env file');
+      }
+      this.signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+      
+      console.log('Connected to network with signer:', this.signer.address);
       
       // Load deployed contract addresses from .env
       if (!process.env.POOL_MANAGER_ADDRESS || 
@@ -40,11 +49,30 @@ class BlockchainService {
       const liquidityManagerAddr = process.env.LIQUIDITY_MANAGER_ADDRESS;
       const swapRouterAddr = process.env.SWAP_ROUTER_ADDRESS;
       
-      // Connect to contracts
-      this.poolManager = await ethers.getContractAt('PoolManager', poolManagerAddr);
-      this.stateView = await ethers.getContractAt('StateView', stateViewAddr);
-      this.liquidityManager = await ethers.getContractAt('SimpleLiquidityManager', liquidityManagerAddr);
-      this.swapRouter = await ethers.getContractAt('WorkingSwapRouter', swapRouterAddr);
+      // Load ABIs from artifacts
+      const artifactsPath = path.join(__dirname, '../../artifacts/contracts');
+      
+      const poolManagerABI = JSON.parse(
+        fs.readFileSync(path.join(artifactsPath, 'core/PoolManager.sol/PoolManager.json'), 'utf8')
+      ).abi;
+      
+      const stateViewABI = JSON.parse(
+        fs.readFileSync(path.join(artifactsPath, 'periphery/lens/StateView.sol/StateView.json'), 'utf8')
+      ).abi;
+      
+      const liquidityManagerABI = JSON.parse(
+        fs.readFileSync(path.join(artifactsPath, 'SimpleLiquidityManager.sol/SimpleLiquidityManager.json'), 'utf8')
+      ).abi;
+      
+      const swapRouterABI = JSON.parse(
+        fs.readFileSync(path.join(artifactsPath, 'WorkingSwapRouter.sol/WorkingSwapRouter.json'), 'utf8')
+      ).abi;
+      
+      // Connect to contracts with signer
+      this.poolManager = new ethers.Contract(poolManagerAddr, poolManagerABI, this.signer);
+      this.stateView = new ethers.Contract(stateViewAddr, stateViewABI, this.signer);
+      this.liquidityManager = new ethers.Contract(liquidityManagerAddr, liquidityManagerABI, this.signer);
+      this.swapRouter = new ethers.Contract(swapRouterAddr, swapRouterABI, this.signer);
       
       console.log('✅ Blockchain service initialized');
       console.log('   PoolManager:', await this.poolManager.getAddress());
@@ -60,40 +88,34 @@ class BlockchainService {
   }
 
   async deployPoolManager() {
-    console.log('Deploying PoolManager...');
-    const PoolManager = await ethers.getContractFactory('PoolManager');
-    const poolManager = await PoolManager.deploy(this.signer.address);
-    await poolManager.waitForDeployment();
-    return await poolManager.getAddress();
+    throw new Error('Contract deployment should be done via Hardhat scripts (npm run deploy:local). This method requires Hardhat environment.');
   }
 
   async deployStateView(poolManagerAddr) {
-    console.log('Deploying StateView...');
-    const StateView = await ethers.getContractFactory('StateView');
-    const stateView = await StateView.deploy(poolManagerAddr);
-    await stateView.waitForDeployment();
-    return await stateView.getAddress();
+    throw new Error('Contract deployment should be done via Hardhat scripts (npm run deploy:local). This method requires Hardhat environment.');
   }
 
   async deployLiquidityManager(poolManagerAddr) {
-    console.log('Deploying SimpleLiquidityManager...');
-    const SimpleLiquidityManager = await ethers.getContractFactory('SimpleLiquidityManager');
-    const liquidityManager = await SimpleLiquidityManager.deploy(poolManagerAddr);
-    await liquidityManager.waitForDeployment();
-    return await liquidityManager.getAddress();
+    throw new Error('Contract deployment should be done via Hardhat scripts (npm run deploy:local). This method requires Hardhat environment.');
   }
 
   async deploySwapRouter(poolManagerAddr) {
-    console.log('Deploying WorkingSwapRouter...');
-    const WorkingSwapRouter = await ethers.getContractFactory('WorkingSwapRouter');
-    const swapRouter = await WorkingSwapRouter.deploy(poolManagerAddr);
-    await swapRouter.waitForDeployment();
-    return await swapRouter.getAddress();
+    throw new Error('Contract deployment should be done via Hardhat scripts (npm run deploy:local). This method requires Hardhat environment.');
   }
 
   async loadToken(tokenAddress) {
     if (!this.tokens[tokenAddress]) {
-      this.tokens[tokenAddress] = await ethers.getContractAt('TestToken', tokenAddress);
+      const tokenABI = [
+        'function balanceOf(address) view returns (uint256)',
+        'function transfer(address to, uint256 amount) returns (bool)',
+        'function approve(address spender, uint256 amount) returns (bool)',
+        'function allowance(address owner, address spender) view returns (uint256)'
+      ];
+      this.tokens[tokenAddress] = new ethers.Contract(
+        tokenAddress,
+        tokenABI,
+        this.signer
+      );
     }
     return this.tokens[tokenAddress];
   }
@@ -124,14 +146,56 @@ class BlockchainService {
     );
   }
 
-  async initializePool(token0Addr, token1Addr, sqrtPriceX96 = null) {
-    const poolKey = this.createPoolKey(token0Addr, token1Addr);
-    const price = sqrtPriceX96 || this.SQRT_PRICE_1_1;
-    
-    const tx = await this.poolManager.initialize(poolKey, price);
-    await tx.wait();
-    
-    return { poolKey, txHash: tx.hash };
+  /**
+   * Convert price ratio to sqrtPriceX96
+   * @param {number} price - Price ratio (e.g., 1 for 1:1, 10 for 10:1, 0.1 for 1:10)
+   * @returns {string} sqrtPriceX96 value
+   */
+  priceToSqrtPriceX96(price) {
+    // sqrtPriceX96 = sqrt(price) * 2^96
+    const Q96 = BigInt(2) ** BigInt(96);
+    const sqrtPrice = Math.sqrt(price);
+    // Convert to BigInt by multiplying with precision
+    const sqrtPriceScaled = BigInt(Math.floor(sqrtPrice * 1e18));
+    const sqrtPriceX96 = (sqrtPriceScaled * Q96) / BigInt(1e18);
+    return sqrtPriceX96.toString();
+  }
+
+  async initializePool(token0Addr, token1Addr, priceRatio = null) {
+    try {
+      const poolKey = this.createPoolKey(token0Addr, token1Addr);
+      
+      // If priceRatio provided, convert to sqrtPriceX96, otherwise use 1:1
+      let sqrtPriceX96;
+      if (priceRatio !== null && priceRatio !== undefined) {
+        sqrtPriceX96 = this.priceToSqrtPriceX96(priceRatio);
+      } else {
+        sqrtPriceX96 = this.SQRT_PRICE_1_1;
+      }
+      
+      const tx = await this.poolManager.initialize(poolKey, sqrtPriceX96);
+      const receipt = await tx.wait();
+      
+      if (receipt.status === 0) {
+        throw new Error('Pool initialization transaction reverted');
+      }
+      
+      return { 
+        poolKey, 
+        txHash: tx.hash,
+        priceRatio: priceRatio || 1,
+        sqrtPriceX96 
+      };
+    } catch (error) {
+      // Check for common pool initialization errors
+      if (error.message.includes('PoolAlreadyInitialized') || 
+          error.message.includes('already initialized') ||
+          error.message.includes('ALREADY_INITIALIZED')) {
+        throw new Error('Pool has already been initialized. Each pool can only be initialized once.');
+      }
+      
+      throw error;
+    }
   }
 
   async addLiquidity(token0Addr, token1Addr, amount0, amount1, tickLower = null, tickUpper = null) {
@@ -174,26 +238,33 @@ class BlockchainService {
     return { poolKey, txHash: tx.hash, liquidityRemoved: liquidityAmount.toString() };
   }
 
-  async executeSwap(tokenInAddr, tokenOutAddr, amountIn, minAmountOut = 0) {
+  async executeSwap(tokenInAddr, tokenOutAddr, amountIn, minAmountOut = 0, userWallet = null) {
     const poolKey = this.createPoolKey(tokenInAddr, tokenOutAddr);
     const tokenIn = await this.loadToken(tokenInAddr);
     const swapRouterAddr = await this.swapRouter.getAddress();
     
+    // Use provided wallet or default signer
+    const wallet = userWallet || this.signer;
+    
+    // Connect token to user's wallet
+    const tokenInWithSigner = tokenIn.connect(wallet);
+    
     // Approve swap router to spend tokens
     const amount = ethers.parseEther(amountIn.toString());
-    await tokenIn.approve(swapRouterAddr, amount);
+    await tokenInWithSigner.approve(swapRouterAddr, amount);
     
     // Determine swap direction
     const zeroForOne = tokenInAddr.toLowerCase() === poolKey.currency0.toLowerCase();
     
-    // Execute swap
+    // Execute swap with user's wallet
     const swapParams = {
       zeroForOne,
       amountSpecified: -amount, // Negative = exact input
       sqrtPriceLimitX96: zeroForOne ? this.MIN_PRICE_LIMIT : this.MAX_PRICE_LIMIT
     };
     
-    const tx = await this.swapRouter.swap(poolKey, swapParams);
+    const swapRouterWithSigner = this.swapRouter.connect(wallet);
+    const tx = await swapRouterWithSigner.swap(poolKey, swapParams);
     const receipt = await tx.wait();
     
     return {
@@ -201,7 +272,8 @@ class BlockchainService {
       poolKey,
       amountIn: amountIn.toString(),
       zeroForOne,
-      gasUsed: receipt.gasUsed.toString()
+      gasUsed: receipt.gasUsed.toString(),
+      userAddress: wallet.address
     };
   }
 
@@ -248,10 +320,63 @@ class BlockchainService {
   }
 
   async getTokenBalance(tokenAddr, accountAddr = null) {
-    const token = await this.loadToken(tokenAddr);
-    const account = accountAddr || this.signer.address;
-    const balance = await token.balanceOf(account);
-    return ethers.formatEther(balance);
+    try {
+      // Validate address format
+      if (!ethers.isAddress(tokenAddr)) {
+        throw new Error(`Invalid token address: ${tokenAddr}`);
+      }
+      if (accountAddr && !ethers.isAddress(accountAddr)) {
+        throw new Error(`Invalid account address: ${accountAddr}`);
+      }
+
+      const token = await this.loadToken(tokenAddr);
+      const account = accountAddr || this.signer.address;
+      
+      // Check if contract exists at address
+      const code = await this.signer.provider.getCode(tokenAddr);
+      if (code === '0x') {
+        throw new Error(`No contract found at address: ${tokenAddr}`);
+      }
+      
+      const balance = await token.balanceOf(account);
+      return ethers.formatEther(balance);
+    } catch (error) {
+      console.error(`Error getting token balance for ${tokenAddr}:`, error.message);
+      throw error;
+    }
+  }
+
+  async getNativeBalance(accountAddr = null) {
+    try {
+      if (accountAddr && !ethers.isAddress(accountAddr)) {
+        throw new Error(`Invalid account address: ${accountAddr}`);
+      }
+      
+      const account = accountAddr || this.signer.address;
+      const balance = await this.signer.provider.getBalance(account);
+      return ethers.formatEther(balance);
+    } catch (error) {
+      console.error(`Error getting native balance for ${accountAddr}:`, error.message);
+      throw error;
+    }
+  }
+
+  async getUserBalances(accountAddr, tokenAddresses = []) {
+    const balances = {
+      native: await this.getNativeBalance(accountAddr),
+      tokens: {}
+    };
+
+    for (const tokenAddr of tokenAddresses) {
+      try {
+        balances.tokens[tokenAddr] = await this.getTokenBalance(tokenAddr, accountAddr);
+      } catch (error) {
+        console.error(`Failed to get balance for token ${tokenAddr}:`, error.message);
+        balances.tokens[tokenAddr] = '0'; // Default to 0 if token balance fails
+      }
+    }
+
+    return balances;
   }
 }
 

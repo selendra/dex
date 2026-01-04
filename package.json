@@ -8,6 +8,7 @@
     "compile": "hardhat compile",
     "deploy:local": "hardhat run scripts/deploy/deploy.js --network localhost",
     "deploy:tokens": "hardhat run scripts/deploy/deploy-tokens.js --network localhost",
+    "transfer:admin": "hardhat run scripts/transfer-to-admin.js --network localhost",
     "node": "hardhat node",
     "clean": "hardhat clean",
     "api": "node api/index.js",

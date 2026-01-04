@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const blockchainService = require('../services/blockchain');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 
 /**
  * POST /api/pool/initialize
@@ -8,12 +9,12 @@ const blockchainService = require('../services/blockchain');
  * Body: {
  *   token0: "0x...",
  *   token1: "0x...",
- *   sqrtPriceX96: "79228162514264337593543950336" (optional, defaults to 1:1)
+ *   priceRatio: 1 (optional, e.g., 1 for 1:1, 10 for 10:1, 0.5 for 1:2)
  * }
  */
-router.post('/initialize', async (req, res, next) => {
+router.post('/initialize', authenticate, requireAdmin, async (req, res, next) => {
   try {
-    const { token0, token1, sqrtPriceX96 } = req.body;
+    const { token0, token1, priceRatio } = req.body;
     
     // Validate input
     if (!token0 || !token1) {
@@ -23,11 +24,19 @@ router.post('/initialize', async (req, res, next) => {
       });
     }
     
+    // Validate price ratio if provided
+    if (priceRatio !== undefined && priceRatio !== null && priceRatio <= 0) {
+      return res.status(400).json({
+        error: 'Invalid price ratio',
+        message: 'Price ratio must be greater than 0'
+      });
+    }
+    
     // Initialize pool
     const result = await blockchainService.initializePool(
       token0,
       token1,
-      sqrtPriceX96 || null
+      priceRatio
     );
     
     res.json({

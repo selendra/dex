@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const blockchainService = require('../services/blockchain');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 
 /**
  * POST /api/liquidity/add
@@ -14,7 +15,7 @@ const blockchainService = require('../services/blockchain');
  *   tickUpper: 887220 (optional)
  * }
  */
-router.post('/add', async (req, res, next) => {
+router.post('/add', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const { token0, token1, amount0, amount1, tickLower, tickUpper } = req.body;
     
@@ -57,7 +58,7 @@ router.post('/add', async (req, res, next) => {
  *   tickUpper: 887220 (optional)
  * }
  */
-router.post('/remove', async (req, res, next) => {
+router.post('/remove', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const { token0, token1, liquidityAmount, tickLower, tickUpper } = req.body;
     

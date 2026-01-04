@@ -1,0 +1,10 @@
+{
+  "admin": {
+    "username": "admin",
+    "passwordHash": "$2b$10$cLQWHwpPLcvY.u8xf9oyuOnpFJRgHdxcuBzEBw5OxgMTsjDi/KTiG",
+    "address": "0xA16a61B250081A9Afe5A8029d69af0d5C7323628",
+    "role": "admin",
+    "encryptedMnemonic": "aW5zdGFsbCBob3VyIGpld2VsIHRhbmsgZW5yaWNoIGVkdWNhdGUgc3RlYWsgaW5kb29yIGltcHVsc2UgZG9tYWluIGdhbGxlcnkgcG9zaXRpb24=.YWRtaW4xMjMwMDAw",
+    "createdAt": "2026-01-04T04:54:23.575Z"
+  }
+}
