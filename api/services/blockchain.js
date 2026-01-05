@@ -16,23 +16,29 @@ class BlockchainService {
     this.MIN_TICK = -887220;
     this.MAX_TICK = 887220;
     this.FEE_MEDIUM = 3000;
-    this.TICK_SPACING_MEDIUM = 60;
+    this.TICK_SPACING_MEDIUM = 1;  // V4 uses 1 for flexibility
     
-    // Price limits for swaps
+    // Price limits for swaps (within valid range)
+    // MIN_SQRT_PRICE = 4295128739 + 1
+    // MAX_SQRT_PRICE = 1461446703485210103287273052203988822378723970342 - 1
     this.MIN_PRICE_LIMIT = "4295128740";
-    this.MAX_PRICE_LIMIT = "1461446703485210103287273052203988822378723970342";
+    this.MAX_PRICE_LIMIT = "1461446703485210103287273052203988822378723970341";
   }
 
   async initialize() {
     try {
-      // Connect to localhost network explicitly
-      const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
+      // Connect to localhost network explicitly with no caching
+      const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545', undefined, {
+        staticNetwork: true,
+        batchMaxCount: 1
+      });
       
       // Get signer using private key from .env
       if (!process.env.PRIVATE_KEY) {
         throw new Error('PRIVATE_KEY not found in .env file');
       }
       this.signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+      this.provider = provider;
       
       console.log('Connected to network with signer:', this.signer.address);
       
@@ -206,20 +212,44 @@ class BlockchainService {
     const token0 = await this.loadToken(poolKey.currency0);
     const token1 = await this.loadToken(poolKey.currency1);
     
-    await token0.transfer(lmAddr, ethers.parseEther(amount0.toString()));
-    await token1.transfer(lmAddr, ethers.parseEther(amount1.toString()));
+    // Parse amounts
+    const amount0Wei = ethers.parseEther(amount0.toString());
+    const amount1Wei = ethers.parseEther(amount1.toString());
     
-    // Add liquidity
-    const liquidityDelta = ethers.parseEther("1000"); // Fixed liquidity amount
+    // Get fresh nonce for each transaction to avoid caching issues
+    let nonce = await this.provider.getTransactionCount(this.signer.address, "pending");
+    
+    // Transfer tokens sequentially with explicit nonce
+    const tx0 = await token0.transfer(lmAddr, amount0Wei, { nonce: nonce++ });
+    await tx0.wait();
+    
+    const tx1 = await token1.transfer(lmAddr, amount1Wei, { nonce: nonce++ });
+    await tx1.wait();
+    
+    // Calculate liquidity delta based on geometric mean of amounts
+    // For full-range liquidity: L = sqrt(amount0 * amount1)
+    // This ensures balanced liquidity provision
+    const amount0Num = parseFloat(amount0);
+    const amount1Num = parseFloat(amount1);
+    const liquidityAmount = Math.sqrt(amount0Num * amount1Num);
+    const liquidityDelta = ethers.parseEther(liquidityAmount.toString());
+    
     const tx = await this.liquidityManager.addLiquidity(
       poolKey,
       tickLower || this.MIN_TICK,
       tickUpper || this.MAX_TICK,
-      liquidityDelta
+      liquidityDelta,
+      { nonce: nonce++ }
     );
     await tx.wait();
     
-    return { poolKey, txHash: tx.hash, liquidityDelta: liquidityDelta.toString() };
+    return { 
+      poolKey, 
+      txHash: tx.hash, 
+      liquidityDelta: liquidityDelta.toString(),
+      amount0Deposited: amount0.toString(),
+      amount1Deposited: amount1.toString()
+    };
   }
 
   async removeLiquidity(token0Addr, token1Addr, liquidityAmount, tickLower = null, tickUpper = null) {
@@ -238,9 +268,79 @@ class BlockchainService {
     return { poolKey, txHash: tx.hash, liquidityRemoved: liquidityAmount.toString() };
   }
 
+  /**
+   * Get swap quote - calculate expected output amount
+   * @param {string} tokenInAddr - Input token address
+   * @param {string} tokenOutAddr - Output token address  
+   * @param {number} amountIn - Input amount
+   * @returns {Object} Quote with estimated output and price impact
+   */
+  async getSwapQuote(tokenInAddr, tokenOutAddr, amountIn) {
+    try {
+      const poolKey = this.createPoolKey(tokenInAddr, tokenOutAddr);
+      const poolId = this.calculatePoolId(poolKey);
+      
+      // Get pool state
+      const slot0 = await this.stateView.getSlot0(poolId);
+      const liquidity = await this.stateView.getLiquidity(poolId);
+      
+      const sqrtPriceX96 = BigInt(slot0[0]);
+      const liquidityBN = BigInt(liquidity);
+      
+      if (liquidityBN === 0n) {
+        throw new Error('Pool has no liquidity');
+      }
+      
+      // Calculate price from sqrtPriceX96
+      // price = (sqrtPriceX96 / 2^96)^2
+      const Q96 = BigInt(2) ** BigInt(96);
+      const priceX192 = sqrtPriceX96 * sqrtPriceX96;
+      const price = Number(priceX192) / Number(Q96 * Q96);
+      
+      // Determine swap direction
+      const zeroForOne = tokenInAddr.toLowerCase() === poolKey.currency0.toLowerCase();
+      
+      // Calculate expected output (simplified constant product formula)
+      // For exact input: amountOut = amountIn * price (adjusted for direction)
+      const amountInNum = parseFloat(amountIn);
+      let estimatedAmountOut;
+      
+      if (zeroForOne) {
+        // Selling token0 for token1: output = input * price
+        estimatedAmountOut = amountInNum * price;
+      } else {
+        // Selling token1 for token0: output = input / price
+        estimatedAmountOut = amountInNum / price;
+      }
+      
+      // Apply fee (0.3% for medium fee tier)
+      const feePercent = poolKey.fee / 1000000; // fee is in hundredths of a bip
+      estimatedAmountOut = estimatedAmountOut * (1 - feePercent);
+      
+      // Calculate price impact (simplified)
+      const liquidityNum = Number(ethers.formatEther(liquidity));
+      const priceImpact = (amountInNum / liquidityNum) * 100; // Percentage
+      
+      return {
+        tokenIn: tokenInAddr,
+        tokenOut: tokenOutAddr,
+        amountIn: amountIn.toString(),
+        estimatedAmountOut: estimatedAmountOut.toFixed(18),
+        price: zeroForOne ? price : 1/price,
+        priceImpact: priceImpact.toFixed(4) + '%',
+        fee: (feePercent * 100).toFixed(2) + '%',
+        poolLiquidity: ethers.formatEther(liquidity)
+      };
+    } catch (error) {
+      console.error('Error getting swap quote:', error.message);
+      throw error;
+    }
+  }
+
   async executeSwap(tokenInAddr, tokenOutAddr, amountIn, minAmountOut = 0, userWallet = null) {
     const poolKey = this.createPoolKey(tokenInAddr, tokenOutAddr);
     const tokenIn = await this.loadToken(tokenInAddr);
+    const tokenOut = await this.loadToken(tokenOutAddr);
     const swapRouterAddr = await this.swapRouter.getAddress();
     
     // Use provided wallet or default signer
@@ -251,7 +351,8 @@ class BlockchainService {
     
     // Approve swap router to spend tokens
     const amount = ethers.parseEther(amountIn.toString());
-    await tokenInWithSigner.approve(swapRouterAddr, amount);
+    const approveTx = await tokenInWithSigner.approve(swapRouterAddr, amount);
+    await approveTx.wait();
     
     // Determine swap direction
     const zeroForOne = tokenInAddr.toLowerCase() === poolKey.currency0.toLowerCase();
@@ -263,14 +364,34 @@ class BlockchainService {
       sqrtPriceLimitX96: zeroForOne ? this.MIN_PRICE_LIMIT : this.MAX_PRICE_LIMIT
     };
     
+    // Get balance before swap to calculate actual output
+    const tokenOutWithSigner = tokenOut.connect(wallet);
+    const balanceBefore = await tokenOutWithSigner.balanceOf(wallet.address);
+    
+    // CRITICAL: Get fresh nonce directly from chain using RPC call
+    const nonceHex = await this.provider.send("eth_getTransactionCount", [wallet.address, "latest"]);
+    const swapNonce = parseInt(nonceHex, 16);
+    
     const swapRouterWithSigner = this.swapRouter.connect(wallet);
-    const tx = await swapRouterWithSigner.swap(poolKey, swapParams);
+    const tx = await swapRouterWithSigner.swap(poolKey, swapParams, { nonce: swapNonce });
     const receipt = await tx.wait();
+    
+    // Get balance after to calculate actual output
+    const balanceAfter = await tokenOutWithSigner.balanceOf(wallet.address);
+    const actualAmountOut = balanceAfter - balanceBefore;
+    const actualAmountOutFormatted = ethers.formatEther(actualAmountOut);
+    
+    // Check slippage
+    if (minAmountOut > 0 && parseFloat(actualAmountOutFormatted) < minAmountOut) {
+      throw new Error(`Slippage exceeded: got ${actualAmountOutFormatted}, expected minimum ${minAmountOut}`);
+    }
     
     return {
       txHash: tx.hash,
       poolKey,
       amountIn: amountIn.toString(),
+      amountOut: actualAmountOutFormatted,
+      minAmountOut: minAmountOut.toString(),
       zeroForOne,
       gasUsed: receipt.gasUsed.toString(),
       userAddress: wallet.address

@@ -6,5 +6,45 @@
     "role": "admin",
     "encryptedMnemonic": "aW5zdGFsbCBob3VyIGpld2VsIHRhbmsgZW5yaWNoIGVkdWNhdGUgc3RlYWsgaW5kb29yIGltcHVsc2UgZG9tYWluIGdhbGxlcnkgcG9zaXRpb24=.YWRtaW4xMjMwMDAw",
     "createdAt": "2026-01-04T04:54:23.575Z"
+  },
+  "testuser": {
+    "username": "testuser",
+    "passwordHash": "$2b$10$MWGjdYDqA9yd3ZWb18reXuEoDfz6nDgBaK/kQqJ4rWnD1X51HyYNS",
+    "address": "0x16c6db6F1061bd511B5F5B3056B6f999efc9ea21",
+    "role": "user",
+    "encryptedMnemonic": "aGFsZiB0aHJpdmUgcmF0ZSBsYXRpbiByYW5jaCBvYnZpb3VzIHNvdXRoIG1vb24gZnJhbWUgdGhlcmUgZ2xhcmUgcmFkaW8=.dGVzdHBhc3MxMjMw",
+    "createdAt": "2026-01-05T00:16:03.768Z"
+  },
+  "testadmin": {
+    "username": "testadmin",
+    "passwordHash": "$2b$10$7H6/iDzQ1zi5Vg0/SOX4uevGT36rJq3fQLyrMl6bIs0Juba6SN.v.",
+    "address": "0xE202F4a199c0e04d19536E3082cD966D90D0b387",
+    "role": "user",
+    "encryptedMnemonic": "bG9naWMgYmxlYWsgcGxlYXNlIGJyaWdodCBteXN0ZXJ5IGZpYmVyIGF1bnQgYWZyYWlkIGJyYXNzIHBvc2l0aW9uIHJlY2VpdmUgbmVpdGhlcg==.YWRtaW4xMjMwMDAw",
+    "createdAt": "2026-01-05T00:20:15.925Z"
+  },
+  "testuser2": {
+    "username": "testuser2",
+    "passwordHash": "$2b$10$ADTBBCqs9AJAqL4lgaA8J.mYhjIumEVUQImJcrRyJzYCjakiyK8WW",
+    "address": "0xc95582694Fd7c72349f55cA0a91Bb89C5560789f",
+    "role": "user",
+    "encryptedMnemonic": "c3RlZWwgZmFuY3kgZ2FsYXh5IHRvZGRsZXIgY3JlYW0gc3VwcmVtZSBlZHVjYXRlIGNhcnQgYXdheSBkcmlsbCBqb3kgYXJyZXN0.dXNlcjEyMzAwMDAw",
+    "createdAt": "2026-01-05T00:20:15.981Z"
+  },
+  "swapuser": {
+    "username": "swapuser",
+    "passwordHash": "$2b$10$AZQ2.WG8azuikzmvP3/znutjphW98l0j0QTkDvA6NSHyUbh0Hcm9y",
+    "address": "0x9509b9AC8CA298BcA451e18888b3096EE74d61Ee",
+    "role": "user",
+    "encryptedMnemonic": "cGFyayBicmFja2V0IGRhbmNlIGVtcG93ZXIgZ2F0aGVyIGR5bmFtaWMgZnJvZyB3cmlzdCB3ZWFwb24gZGlldCBob2xlIGdpcmw=.dGVzdDEyMzAwMDAw",
+    "createdAt": "2026-01-05T00:28:19.724Z"
+  },
+  "alice": {
+    "username": "alice",
+    "passwordHash": "$2b$10$Tcwq9eUCMET0aDfuEwWPYuG7.U4cZQmyzncOPuuNaXpfMvPpKaBX2",
+    "address": "0x3C485e21bAAB81aD076C99e29e0a96Bef958F756",
+    "role": "user",
+    "encryptedMnemonic": "c29tZW9uZSByaWRnZSB0YW5rIGRvb3IgZ29kZGVzcyBhbHBoYSBjb3VudHJ5IGJyaWNrIHNpc3RlciBhbmtsZSBvcmFuZ2UgbWFnbmV0.YWxpY2UxMjMwMDAw",
+    "createdAt": "2026-01-05T00:47:17.979Z"
   }
 }

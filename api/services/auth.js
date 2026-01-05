@@ -149,8 +149,10 @@ class AuthService {
     // Decrypt mnemonic
     const mnemonic = this.decryptMnemonic(user.encryptedMnemonic, password);
     
-    // Create wallet from mnemonic
-    return ethers.Wallet.fromPhrase(mnemonic);
+    // Create wallet from mnemonic with fresh provider
+    const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
+    const wallet = ethers.Wallet.fromPhrase(mnemonic);
+    return wallet.connect(provider);
   }
 
   // Simple encryption (in production, use proper encryption like crypto-js with AES)

@@ -100,8 +100,8 @@ router.post('/quote', optionalAuth, async (req, res, next) => {
       });
     }
     
-    // Get pool info to calculate expected output
-    const poolInfo = await blockchainService.getPoolInfo(tokenIn, tokenOut);
+    // Get swap quote with calculated output
+    const quote = await blockchainService.getSwapQuote(tokenIn, tokenOut, parseFloat(amountIn));
     
     // If user is authenticated, include their balances
     let userBalances = null;
@@ -116,13 +116,8 @@ router.post('/quote', optionalAuth, async (req, res, next) => {
       success: true,
       message: 'Quote calculated',
       data: {
-        tokenIn,
-        tokenOut,
-        amountIn,
-        poolInfo,
-        userBalances,
-        estimatedAmountOut: 'Use pool price calculation', // TODO: Implement price calculation
-        priceImpact: 'calculated based on liquidity'
+        ...quote,
+        userBalances
       }
     });
   } catch (error) {
