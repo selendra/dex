@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { swapAPI, poolAPI } from '../services/api';
+import { swapAPI } from '../services/api';
 import './Swap.css';
 
 const TOKENS = {
@@ -20,17 +20,22 @@ function Swap({ user }) {
   const [balances, setBalances] = useState({});
 
   useEffect(() => {
-    loadBalances();
-  }, []);
+    if (user) {
+      loadBalances();
+    }
+  }, [user]);
 
   const loadBalances = async () => {
     try {
-      const balancePromises = Object.keys(TOKENS).map(async (key) => {
-        const result = await poolAPI.getTokenBalance(TOKENS[key].address);
-        return { [key]: result.data.balance };
+      const tokenAddresses = Object.values(TOKENS).map(t => t.address);
+      const result = await swapAPI.getBalances(tokenAddresses);
+      
+      // Map addresses back to token symbols
+      const balanceMap = {};
+      Object.keys(TOKENS).forEach(key => {
+        const address = TOKENS[key].address;
+        balanceMap[key] = result.data?.tokens?.[address] || '0';
       });
-      const results = await Promise.all(balancePromises);
-      const balanceMap = Object.assign({}, ...results);
       setBalances(balanceMap);
     } catch (err) {
       console.error('Failed to load balances:', err);

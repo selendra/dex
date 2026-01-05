@@ -46,5 +46,13 @@
     "role": "user",
     "encryptedMnemonic": "c29tZW9uZSByaWRnZSB0YW5rIGRvb3IgZ29kZGVzcyBhbHBoYSBjb3VudHJ5IGJyaWNrIHNpc3RlciBhbmtsZSBvcmFuZ2UgbWFnbmV0.YWxpY2UxMjMwMDAw",
     "createdAt": "2026-01-05T00:47:17.979Z"
+  },
+  "testfrontend": {
+    "username": "testfrontend",
+    "passwordHash": "$2b$10$sqGDEP/gP5CTQtrUpXlBK.OOvD7ugJxyKxzeXrO7G028Vzm/a9Qoy",
+    "address": "0x300FC0acD6707B43eC196AA472CD9b4958585ca9",
+    "role": "user",
+    "encryptedMnemonic": "ZmVtYWxlIHN1c3BlY3QgcmF0aGVyIGlubWF0ZSBib3VuY2Ugc2xhbSBtYXNrIHRlbmFudCB3cm9uZyBwYW5pYyBnb3Zlcm4gcmlkZQ==.dGVzdDEyMzAwMDAw",
+    "createdAt": "2026-01-05T11:53:15.723Z"
   }
 }

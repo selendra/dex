@@ -79,10 +79,10 @@ export const authAPI = {
 
 // Swap API
 export const swapAPI = {
-  swap: async (token0, token1, amountIn, password) => {
+  swap: async (tokenIn, tokenOut, amountIn, password) => {
     const response = await api.post('/swap', {
-      token0,
-      token1,
+      tokenIn,
+      tokenOut,
       amountIn,
       password,
     });
