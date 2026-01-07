@@ -1,0 +1,13 @@
+{
+  "network": "selendra",
+  "chainId": 1961,
+  "rpcUrl": "https://rpc.selendra.org",
+  "deployer": "0x725f3F18b27A94df1a4901bbfb7561Dc3B248481",
+  "deployedAt": "2026-01-07T11:35:56.526Z",
+  "contracts": {
+    "PoolManager": "0x9A09943675B06F92257A63d18AdFD0f721b78dF3",
+    "StateView": "0x208beec49645c750Be8189A9Ae6F3Ce026cba0D4",
+    "LiquidityManager": "0x7f39Ca3c13D79941dF3e4992F37d69643bffad21",
+    "SwapRouter": "0xf5278649760F9a5890BDb1E249D2B9B040c8448a"
+  }
+}

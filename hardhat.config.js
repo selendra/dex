@@ -61,6 +61,12 @@ module.exports = {
     sepolia: {
       url: process.env.SEPOLIA_RPC_URL || "",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
+    },
+    selendra: {
+      url: process.env.SELENDRA_RPC_URL || "https://rpc.selendra.org",
+      chainId: 1961,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: 10000000000 // 10 gwei
     }
   },
   gasReporter: {

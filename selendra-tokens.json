@@ -1,0 +1,33 @@
+{
+  "network": "selendra",
+  "chainId": 1961,
+  "rpcUrl": "https://rpc.selendra.org",
+  "deployer": "0x725f3F18b27A94df1a4901bbfb7561Dc3B248481",
+  "deployedAt": "2026-01-07T11:34:13.073Z",
+  "tokens": {
+    "TUSD": {
+      "address": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+      "name": "Test USD",
+      "symbol": "TUSD",
+      "description": "Stablecoin pegged to USD"
+    },
+    "TBROWN": {
+      "address": "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4",
+      "name": "Test Brown",
+      "symbol": "TBROWN",
+      "description": "Brown ecosystem token"
+    },
+    "TSMART": {
+      "address": "0x3F35Ff1a1C3AbfBc916dECde3DC08b2bFFFe8900",
+      "name": "Test Smart",
+      "symbol": "TSMART",
+      "description": "Smart contract token"
+    },
+    "TZANDO": {
+      "address": "0x2c0832A61271eA2E989B90202219ffB630c00901",
+      "name": "Test Zando",
+      "symbol": "TZANDO",
+      "description": "Zando marketplace token"
+    }
+  }
+}

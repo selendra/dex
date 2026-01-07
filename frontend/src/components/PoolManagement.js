@@ -3,15 +3,15 @@ import { poolAPI } from '../services/api';
 import './Admin.css';
 
 const TOKENS = {
-  TOKENS: { address: process.env.REACT_APP_TOKENS_ADDRESS || '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9', name: 'TokenS', symbol: 'TOKENS' },
-  TOKENA: { address: process.env.REACT_APP_TOKENA_ADDRESS || '0x5FC8d32690cc91D4c39d9d3abcBD16989F875707', name: 'TokenA', symbol: 'TOKENA' },
-  TOKENB: { address: process.env.REACT_APP_TOKENB_ADDRESS || '0x0165878A594ca255338adfa4d48449f69242Eb8F', name: 'TokenB', symbol: 'TOKENB' },
-  TOKENC: { address: process.env.REACT_APP_TOKENC_ADDRESS || '0xa513E6E4b8f2a923D98304ec87F64353C4D5C853', name: 'TokenC', symbol: 'TOKENC' },
+  TUSD: { address: process.env.REACT_APP_TUSD_ADDRESS || '0xA9233751245AFB7420B6AE108dF94E63418aD4d9', name: 'Test USD', symbol: 'TUSD' },
+  TBROWN: { address: process.env.REACT_APP_TBROWN_ADDRESS || '0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4', name: 'Test Brown', symbol: 'TBROWN' },
+  TSMART: { address: process.env.REACT_APP_TSMART_ADDRESS || '0x3F35Ff1a1C3AbfBc916dECde3DC08b2bFFFe8900', name: 'Test Smart', symbol: 'TSMART' },
+  TZANDO: { address: process.env.REACT_APP_TZANDO_ADDRESS || '0x2c0832A61271eA2E989B90202219ffB630c00901', name: 'Test Zando', symbol: 'TZANDO' },
 };
 
 function PoolManagement({ user }) {
-  const [token0, setToken0] = useState('TOKENS');
-  const [token1, setToken1] = useState('TOKENA');
+  const [token0, setToken0] = useState('TUSD');
+  const [token1, setToken1] = useState('TBROWN');
   const [priceRatio, setPriceRatio] = useState('1');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

@@ -27,8 +27,28 @@ class BlockchainService {
 
   async initialize() {
     try {
-      // Connect to localhost network explicitly with no caching
-      const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545', undefined, {
+      // Determine which network to use
+      const activeNetwork = process.env.ACTIVE_NETWORK || 'localhost';
+      let rpcUrl, poolManagerAddr, stateViewAddr, liquidityManagerAddr, swapRouterAddr;
+      
+      if (activeNetwork === 'selendra') {
+        rpcUrl = process.env.SELENDRA_RPC_URL || 'https://rpc.selendra.org';
+        poolManagerAddr = process.env.SELENDRA_POOL_MANAGER_ADDRESS;
+        stateViewAddr = process.env.SELENDRA_STATE_VIEW_ADDRESS;
+        liquidityManagerAddr = process.env.SELENDRA_LIQUIDITY_MANAGER_ADDRESS;
+        swapRouterAddr = process.env.SELENDRA_SWAP_ROUTER_ADDRESS;
+        console.log('🌐 Connecting to SELENDRA network...');
+      } else {
+        rpcUrl = 'http://127.0.0.1:8545';
+        poolManagerAddr = process.env.POOL_MANAGER_ADDRESS;
+        stateViewAddr = process.env.STATE_VIEW_ADDRESS;
+        liquidityManagerAddr = process.env.LIQUIDITY_MANAGER_ADDRESS;
+        swapRouterAddr = process.env.SWAP_ROUTER_ADDRESS;
+        console.log('🏠 Connecting to LOCALHOST network...');
+      }
+      
+      // Connect to network
+      const provider = new ethers.JsonRpcProvider(rpcUrl, undefined, {
         staticNetwork: true,
         batchMaxCount: 1
       });
@@ -39,21 +59,14 @@ class BlockchainService {
       }
       this.signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
       this.provider = provider;
+      this.activeNetwork = activeNetwork;
       
       console.log('Connected to network with signer:', this.signer.address);
       
-      // Load deployed contract addresses from .env
-      if (!process.env.POOL_MANAGER_ADDRESS || 
-          !process.env.STATE_VIEW_ADDRESS || 
-          !process.env.LIQUIDITY_MANAGER_ADDRESS || 
-          !process.env.SWAP_ROUTER_ADDRESS) {
-        throw new Error('Missing contract addresses in .env file. Please run: npm run deploy:local && npm run deploy:tokens');
+      // Load deployed contract addresses
+      if (!poolManagerAddr || !stateViewAddr || !liquidityManagerAddr || !swapRouterAddr) {
+        throw new Error(`Missing contract addresses for ${activeNetwork} network in .env file.`);
       }
-      
-      const poolManagerAddr = process.env.POOL_MANAGER_ADDRESS;
-      const stateViewAddr = process.env.STATE_VIEW_ADDRESS;
-      const liquidityManagerAddr = process.env.LIQUIDITY_MANAGER_ADDRESS;
-      const swapRouterAddr = process.env.SWAP_ROUTER_ADDRESS;
       
       // Load ABIs from artifacts
       const artifactsPath = path.join(__dirname, '../../artifacts/contracts');
@@ -80,7 +93,7 @@ class BlockchainService {
       this.liquidityManager = new ethers.Contract(liquidityManagerAddr, liquidityManagerABI, this.signer);
       this.swapRouter = new ethers.Contract(swapRouterAddr, swapRouterABI, this.signer);
       
-      console.log('✅ Blockchain service initialized');
+      console.log(`✅ Blockchain service initialized (${activeNetwork.toUpperCase()})`);
       console.log('   PoolManager:', await this.poolManager.getAddress());
       console.log('   StateView:', await this.stateView.getAddress());
       console.log('   LiquidityManager:', await this.liquidityManager.getAddress());
