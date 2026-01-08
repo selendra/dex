@@ -135,8 +135,8 @@ export const poolAPI = {
 
 // Liquidity API
 export const liquidityAPI = {
-  add: async (token0, token1, amount0, amount1, tickLower = null, tickUpper = null) => {
-    const data = { token0, token1, amount0, amount1 };
+  add: async (token0, token1, amount0, amount1, password, tickLower = null, tickUpper = null) => {
+    const data = { token0, token1, amount0, amount1, password };
     if (tickLower !== null) data.tickLower = tickLower;
     if (tickUpper !== null) data.tickUpper = tickUpper;
     const response = await api.post('/liquidity/add', data);

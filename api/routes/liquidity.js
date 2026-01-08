@@ -3,32 +3,43 @@ const router = express.Router();
 const blockchainService = require('../services/blockchain');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 
+const authService = require('../services/auth');
+
 /**
  * POST /api/liquidity/add
- * Add liquidity to a pool
+ * Add liquidity to a pool using user's wallet
  * Body: {
  *   token0: "0x...",
  *   token1: "0x...",
  *   amount0: "1000",
  *   amount1: "1000",
+ *   password: "user's password" (required to decrypt wallet),
  *   tickLower: -887220 (optional),
  *   tickUpper: 887220 (optional)
  * }
  */
 router.post('/add', authenticate, requireAdmin, async (req, res, next) => {
   try {
-    const { token0, token1, amount0, amount1, tickLower, tickUpper } = req.body;
+    const { token0, token1, amount0, amount1, password, tickLower, tickUpper } = req.body;
     
     // Validate input
-    if (!token0 || !token1 || !amount0 || !amount1) {
+    if (!token0 || !token1 || !amount0 || !amount1 || !password) {
       return res.status(400).json({
         error: 'Missing required fields',
-        required: ['token0', 'token1', 'amount0', 'amount1']
+        required: ['token0', 'token1', 'amount0', 'amount1', 'password']
       });
     }
     
-    // Add liquidity
-    const result = await blockchainService.addLiquidity(
+    // Get user's wallet using their password
+    const userWallet = authService.getUserWallet(
+      req.user.username, 
+      password,
+      blockchainService.provider
+    );
+    
+    // Add liquidity using user's wallet
+    const result = await blockchainService.addLiquidityWithWallet(
+      userWallet,
       token0,
       token1,
       parseFloat(amount0),

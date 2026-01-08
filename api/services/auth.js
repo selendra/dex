@@ -140,7 +140,7 @@ class AuthService {
     return this.users[username];
   }
 
-  getUserWallet(username, password) {
+  getUserWallet(username, password, provider = null) {
     const user = this.users[username];
     if (!user) {
       throw new Error('User not found');
@@ -149,8 +149,15 @@ class AuthService {
     // Decrypt mnemonic
     const mnemonic = this.decryptMnemonic(user.encryptedMnemonic, password);
     
-    // Create wallet from mnemonic with fresh provider
-    const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
+    // Create wallet from mnemonic
+    // If provider is passed, use it; otherwise create a default one
+    if (!provider) {
+      const activeNetwork = process.env.ACTIVE_NETWORK || 'localhost';
+      const rpcUrl = activeNetwork === 'selendra' 
+        ? (process.env.SELENDRA_RPC_URL || 'https://rpc.selendra.org')
+        : 'http://127.0.0.1:8545';
+      provider = new ethers.JsonRpcProvider(rpcUrl);
+    }
     const wallet = ethers.Wallet.fromPhrase(mnemonic);
     return wallet.connect(provider);
   }

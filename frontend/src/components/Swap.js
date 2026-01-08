@@ -3,10 +3,10 @@ import { swapAPI } from '../services/api';
 import './Swap.css';
 
 const TOKENS = {
-  TUSD: { address: process.env.REACT_APP_TUSD_ADDRESS || '0xA9233751245AFB7420B6AE108dF94E63418aD4d9', name: 'Test USD', symbol: 'TUSD' },
-  TBROWN: { address: process.env.REACT_APP_TBROWN_ADDRESS || '0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4', name: 'Test Brown', symbol: 'TBROWN' },
-  TSMART: { address: process.env.REACT_APP_TSMART_ADDRESS || '0x3F35Ff1a1C3AbfBc916dECde3DC08b2bFFFe8900', name: 'Test Smart', symbol: 'TSMART' },
-  TZANDO: { address: process.env.REACT_APP_TZANDO_ADDRESS || '0x2c0832A61271eA2E989B90202219ffB630c00901', name: 'Test Zando', symbol: 'TZANDO' },
+  TUSD: { address: process.env.REACT_APP_TUSD_ADDRESS || '0xA9233751245AFB7420B6AE108dF94E63418aD4d9', name: 'Test USD', symbol: 'TUSD', price: 1.00 },
+  TBROWN: { address: process.env.REACT_APP_TBROWN_ADDRESS || '0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4', name: 'Test Brown', symbol: 'TBROWN', price: 0.50 },
+  TSMART: { address: process.env.REACT_APP_TSMART_ADDRESS || '0x3F35Ff1a1C3AbfBc916dECde3DC08b2bFFFe8900', name: 'Test Smart', symbol: 'TSMART', price: 2.00 },
+  TZANDO: { address: process.env.REACT_APP_TZANDO_ADDRESS || '0x2c0832A61271eA2E989B90202219ffB630c00901', name: 'Test Zando', symbol: 'TZANDO', price: 1.50 },
 };
 
 function Swap({ user }) {
@@ -42,6 +42,13 @@ function Swap({ user }) {
     }
   };
 
+  const formatBalance = (balance) => {
+    const num = parseFloat(balance);
+    if (isNaN(num) || num === 0) return '0.00';
+    if (num < 0.01) return num.toExponential(2);
+    return num.toFixed(2);
+  };
+
   const handleSwap = async (e) => {
     e.preventDefault();
     setError('');
@@ -72,7 +79,9 @@ function Swap({ user }) {
         password
       );
 
-      setSuccess(`Swap successful! ${result.data.amountIn} ${tokenIn} → ${result.data.amountOut} ${tokenOut}`);
+      const amtIn = parseFloat(result.data.amountIn).toFixed(2);
+      const amtOut = parseFloat(result.data.amountOut).toFixed(2);
+      setSuccess(`Swap successful! ${amtIn} ${tokenIn} → ${amtOut} ${tokenOut}`);
       setAmountIn('');
       setPassword('');
       
@@ -102,7 +111,8 @@ function Swap({ user }) {
               {Object.keys(TOKENS).map((key) => (
                 <div key={key} className="balance-item">
                   <span className="token-symbol">{TOKENS[key].symbol}</span>
-                  <span className="balance-amount">{balances[key] || '0'}</span>
+                  <span className="balance-amount">{formatBalance(balances[key])}</span>
+                  <span className="token-price">${TOKENS[key].price.toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -112,7 +122,7 @@ function Swap({ user }) {
         <form onSubmit={handleSwap}>
           <div className="swap-inputs">
             <div className="swap-input-group">
-              <label>From</label>
+              <label>From ({TOKENS[tokenIn].symbol} @ ${TOKENS[tokenIn].price.toFixed(2)})</label>
               <div className="input-with-select">
                 <input
                   type="number"
@@ -137,7 +147,7 @@ function Swap({ user }) {
             </button>
 
             <div className="swap-input-group">
-              <label>To</label>
+              <label>To ({TOKENS[tokenOut].symbol} @ ${TOKENS[tokenOut].price.toFixed(2)})</label>
               <div className="input-with-select">
                 <input
                   type="text"
@@ -155,6 +165,14 @@ function Swap({ user }) {
               </div>
             </div>
           </div>
+
+          {/* Estimated swap info */}
+          {amountIn && parseFloat(amountIn) > 0 && (
+            <div className="swap-estimate">
+              <p>Estimated: {(parseFloat(amountIn) * TOKENS[tokenIn].price / TOKENS[tokenOut].price).toFixed(2)} {tokenOut}</p>
+              <p className="rate">Rate: 1 {tokenIn} = {(TOKENS[tokenIn].price / TOKENS[tokenOut].price).toFixed(4)} {tokenOut}</p>
+            </div>
+          )}
 
           <div className="form-group">
             <label>Password (to unlock wallet)</label>

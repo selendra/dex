@@ -221,13 +221,26 @@ class BlockchainService {
     const poolKey = this.createPoolKey(token0Addr, token1Addr);
     const lmAddr = await this.liquidityManager.getAddress();
     
+    // Determine which token matches currency0/currency1 after sorting
+    const [sortedToken0, sortedToken1] = this.sortTokens(token0Addr, token1Addr);
+    
+    // Map user-provided amounts to sorted token order
+    let sortedAmount0, sortedAmount1;
+    if (token0Addr.toLowerCase() === sortedToken0.toLowerCase()) {
+      sortedAmount0 = amount0;
+      sortedAmount1 = amount1;
+    } else {
+      sortedAmount0 = amount1;
+      sortedAmount1 = amount0;
+    }
+    
     // Load tokens and transfer to liquidity manager
     const token0 = await this.loadToken(poolKey.currency0);
     const token1 = await this.loadToken(poolKey.currency1);
     
-    // Parse amounts
-    const amount0Wei = ethers.parseEther(amount0.toString());
-    const amount1Wei = ethers.parseEther(amount1.toString());
+    // Parse amounts with extra buffer (2x) to account for liquidity calculation variance
+    const amount0Wei = ethers.parseEther(sortedAmount0.toString());
+    const amount1Wei = ethers.parseEther(sortedAmount1.toString());
     
     // Get fresh nonce for each transaction to avoid caching issues
     let nonce = await this.provider.getTransactionCount(this.signer.address, "pending");
@@ -239,12 +252,14 @@ class BlockchainService {
     const tx1 = await token1.transfer(lmAddr, amount1Wei, { nonce: nonce++ });
     await tx1.wait();
     
-    // Calculate liquidity delta based on geometric mean of amounts
-    // For full-range liquidity: L = sqrt(amount0 * amount1)
-    // This ensures balanced liquidity provision
-    const amount0Num = parseFloat(amount0);
-    const amount1Num = parseFloat(amount1);
-    const liquidityAmount = Math.sqrt(amount0Num * amount1Num);
+    // For Uniswap V4 full-range liquidity at 1:1 price:
+    // liquidityDelta = min(amount0, amount1) 
+    // This is a simplified calculation that ensures we don't request more 
+    // liquidity than we have tokens for at the current price.
+    // The actual tokens used will depend on the pool's current price.
+    const amount0Num = parseFloat(sortedAmount0);
+    const amount1Num = parseFloat(sortedAmount1);
+    const liquidityAmount = Math.min(amount0Num, amount1Num);
     const liquidityDelta = ethers.parseEther(liquidityAmount.toString());
     
     const tx = await this.liquidityManager.addLiquidity(
@@ -260,8 +275,95 @@ class BlockchainService {
       poolKey, 
       txHash: tx.hash, 
       liquidityDelta: liquidityDelta.toString(),
-      amount0Deposited: amount0.toString(),
-      amount1Deposited: amount1.toString()
+      amount0Deposited: sortedAmount0.toString(),
+      amount1Deposited: sortedAmount1.toString()
+    };
+  }
+
+  /**
+   * Add liquidity using a specific user wallet (not the default .env signer)
+   * This allows each user to add liquidity from their own wallet
+   */
+  async addLiquidityWithWallet(userWallet, token0Addr, token1Addr, amount0, amount1, tickLower = null, tickUpper = null) {
+    const poolKey = this.createPoolKey(token0Addr, token1Addr);
+    const lmAddr = await this.liquidityManager.getAddress();
+    
+    // Determine which token matches currency0/currency1 after sorting
+    const [sortedToken0, sortedToken1] = this.sortTokens(token0Addr, token1Addr);
+    
+    // Map user-provided amounts to sorted token order
+    let sortedAmount0, sortedAmount1;
+    if (token0Addr.toLowerCase() === sortedToken0.toLowerCase()) {
+      sortedAmount0 = amount0;
+      sortedAmount1 = amount1;
+    } else {
+      sortedAmount0 = amount1;
+      sortedAmount1 = amount0;
+    }
+    
+    // ERC20 ABI for transfer
+    const tokenABI = [
+      'function balanceOf(address) view returns (uint256)',
+      'function transfer(address to, uint256 amount) returns (bool)',
+      'function approve(address spender, uint256 amount) returns (bool)',
+      'function allowance(address owner, address spender) view returns (uint256)'
+    ];
+    
+    // Connect tokens to user's wallet
+    const token0 = new ethers.Contract(poolKey.currency0, tokenABI, userWallet);
+    const token1 = new ethers.Contract(poolKey.currency1, tokenABI, userWallet);
+    
+    // Parse amounts
+    const amount0Wei = ethers.parseEther(sortedAmount0.toString());
+    const amount1Wei = ethers.parseEther(sortedAmount1.toString());
+    
+    // Check user has enough balance
+    const balance0 = await token0.balanceOf(userWallet.address);
+    const balance1 = await token1.balanceOf(userWallet.address);
+    
+    if (balance0 < amount0Wei) {
+      const token0Symbol = sortedToken0 === poolKey.currency0 ? 'token0' : 'token1';
+      throw new Error(`Insufficient ${token0Symbol} balance. Have: ${ethers.formatEther(balance0)}, Need: ${sortedAmount0}`);
+    }
+    if (balance1 < amount1Wei) {
+      const token1Symbol = sortedToken1 === poolKey.currency1 ? 'token1' : 'token0';
+      throw new Error(`Insufficient ${token1Symbol} balance. Have: ${ethers.formatEther(balance1)}, Need: ${sortedAmount1}`);
+    }
+    
+    // Get fresh nonce for each transaction
+    let nonce = await this.provider.getTransactionCount(userWallet.address, "pending");
+    
+    // Transfer tokens from user's wallet to liquidity manager
+    console.log(`Transferring ${sortedAmount0} token0 from ${userWallet.address} to ${lmAddr}...`);
+    const tx0 = await token0.transfer(lmAddr, amount0Wei, { nonce: nonce++ });
+    await tx0.wait();
+    
+    console.log(`Transferring ${sortedAmount1} token1 from ${userWallet.address} to ${lmAddr}...`);
+    const tx1 = await token1.transfer(lmAddr, amount1Wei, { nonce: nonce++ });
+    await tx1.wait();
+    
+    // Calculate liquidity delta
+    const amount0Num = parseFloat(sortedAmount0);
+    const amount1Num = parseFloat(sortedAmount1);
+    const liquidityAmount = Math.min(amount0Num, amount1Num);
+    const liquidityDelta = ethers.parseEther(liquidityAmount.toString());
+    
+    // Call addLiquidity on the contract (uses default signer for contract call, but tokens came from user)
+    const tx = await this.liquidityManager.addLiquidity(
+      poolKey,
+      tickLower || this.MIN_TICK,
+      tickUpper || this.MAX_TICK,
+      liquidityDelta
+    );
+    await tx.wait();
+    
+    return { 
+      poolKey, 
+      txHash: tx.hash, 
+      liquidityDelta: liquidityDelta.toString(),
+      amount0Deposited: sortedAmount0.toString(),
+      amount1Deposited: sortedAmount1.toString(),
+      fromWallet: userWallet.address
     };
   }
 

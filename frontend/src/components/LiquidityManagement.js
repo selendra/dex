@@ -15,6 +15,7 @@ function LiquidityManagement({ user }) {
   const [token1, setToken1] = useState('TBROWN');
   const [amount0, setAmount0] = useState('');
   const [amount1, setAmount1] = useState('');
+  const [password, setPassword] = useState('');
   const [liquidityAmount, setLiquidityAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +31,11 @@ function LiquidityManagement({ user }) {
       return;
     }
 
+    if (!password) {
+      setError('Please enter your password to authorize the transaction');
+      return;
+    }
+
     if (token0 === token1) {
       setError('Cannot add liquidity with same token');
       return;
@@ -42,12 +48,14 @@ function LiquidityManagement({ user }) {
         TOKENS[token0].address,
         TOKENS[token1].address,
         amount0,
-        amount1
+        amount1,
+        password
       );
 
       setSuccess(`Liquidity added: ${amount0} ${token0} + ${amount1} ${token1}`);
       setAmount0('');
       setAmount1('');
+      setPassword('');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to add liquidity');
     } finally {
@@ -164,6 +172,17 @@ function LiquidityManagement({ user }) {
                 onChange={(e) => setAmount1(e.target.value)}
                 placeholder="1000"
                 step="any"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Password (to sign transaction)</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
                 required
               />
             </div>

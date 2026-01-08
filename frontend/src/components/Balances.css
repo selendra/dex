@@ -108,6 +108,13 @@
   font-family: 'Courier New', monospace;
 }
 
+.token-price {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.875rem;
+  color: #10b981;
+  font-weight: 600;
+}
+
 .native-balance .token-address {
   color: rgba(255, 255, 255, 0.8);
 }
@@ -117,6 +124,7 @@
   align-items: baseline;
   gap: 0.5rem;
   margin-top: 1rem;
+  flex-wrap: wrap;
 }
 
 .balance-amount .amount {
@@ -129,7 +137,38 @@
   color: #64748b;
 }
 
+.balance-amount .value {
+  font-size: 1rem;
+  color: #10b981;
+  font-weight: 600;
+  margin-left: auto;
+  background: #ecfdf5;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+}
+
 .native-balance .balance-amount .symbol {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.total-value {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.total-value .token-icon {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.total-value h3 {
+  color: white;
+}
+
+.total-value .token-address {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.total-value .balance-amount .symbol {
   color: rgba(255, 255, 255, 0.9);
 }
 
