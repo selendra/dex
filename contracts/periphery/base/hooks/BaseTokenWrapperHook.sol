@@ -47,20 +47,20 @@ abstract contract BaseTokenWrapperHook is BaseHook, DeltaResolver {
     /// @notice The wrapped token currency (e.g., WETH)
     Currency public immutable wrapperCurrency;
 
-    /// @notice The underlying token currency (e.g., ETH)
+    /// @notice The underlying token currency (e.g., SEL)
     Currency public immutable underlyingCurrency;
 
     /// @notice Indicates whether wrapping occurs when swapping from token0 to token1
     /// @dev This is determined by the relative ordering of the wrapper and underlying tokens
-    /// @dev If true: token0 is underlying (e.g. ETH) and token1 is wrapper (e.g. WETH)
-    /// @dev If false: token0 is wrapper (e.g. WETH) and token1 is underlying (e.g. ETH)
+    /// @dev If true: token0 is underlying (e.g. SEL) and token1 is wrapper (e.g. WETH)
+    /// @dev If false: token0 is wrapper (e.g. WETH) and token1 is underlying (e.g. SEL)
     /// @dev This is set in the constructor based on the token addresses to ensure consistent behavior
     bool public immutable wrapZeroForOne;
 
     /// @notice Creates a new token wrapper hook
     /// @param _manager The Uniswap V4 pool manager
     /// @param _wrapper The wrapped token currency (e.g., WETH)
-    /// @param _underlying The underlying token currency (e.g., ETH)
+    /// @param _underlying The underlying token currency (e.g., SEL)
     constructor(IPoolManager _manager, Currency _wrapper, Currency _underlying) BaseHook(_manager) {
         wrapperCurrency = _wrapper;
         underlyingCurrency = _underlying;

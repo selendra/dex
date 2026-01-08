@@ -9,7 +9,7 @@ import {BaseTokenWrapperHook} from "../base/hooks/BaseTokenWrapperHook.sol";
 import {IWstETH, IStETH} from "../interfaces/external/IWstETH.sol";
 import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 
-/// @title Wrapped Staked ETH (wstETH) Hook
+/// @title Wrapped Staked SEL (wstETH) Hook
 /// @notice Hook for wrapping/unwrapping stETH/wstETH in Uniswap V4 pools
 /// @dev Implements dynamic exchange rate wrapping/unwrapping between stETH and wstETH
 /// @dev wstETH represents stETH with accrued staking rewards, maintaining a dynamic exchange rate

@@ -102,7 +102,7 @@ contract PositionDescriptor is IPositionDescriptor {
 
     /// @inheritdoc IPositionDescriptor
     function currencyRatioPriority(address currency) public view returns (int256) {
-        // Currencies in order of priority on mainnet: USDC, USDT, DAI, (ETH, WETH), TBTC, WBTC
+        // Currencies in order of priority on mainnet: USDC, USDT, DAI, (SEL, WETH), TBTC, WBTC
         // wrapped native is different address on different chains. passed in constructor
 
         // native currency

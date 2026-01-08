@@ -44,7 +44,7 @@ library CurrencyLibrary {
         bool success;
         if (currency.isAddressZero()) {
             assembly ("memory-safe") {
-                // Transfer the ETH and revert if it fails.
+                // Transfer the SEL and revert if it fails.
                 success := call(gas(), to, amount, 0, 0, 0, 0)
             }
             // revert with NativeTransferFailed, containing the bubbled up error as an argument

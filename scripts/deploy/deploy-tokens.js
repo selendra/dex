@@ -7,7 +7,7 @@ async function main() {
 
   const [deployer] = await hre.ethers.getSigners();
   console.log("\nDeploying with account:", deployer.address);
-  console.log("Balance:", hre.ethers.formatEther(await hre.ethers.provider.getBalance(deployer.address)), "ETH");
+  console.log("Balance:", hre.ethers.formatEther(await hre.ethers.provider.getBalance(deployer.address)), "SEL");
 
   const TestToken = await hre.ethers.getContractFactory("TestToken");
 

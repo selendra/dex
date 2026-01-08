@@ -23,7 +23,7 @@ contract WstETHRoutingHook is WstETHHook {
         // actualUnderlyingAmount = stETH.balanceOf(address(this));
         //
         // when calling take on the PoolManager the amount is rounded down to the nearest share
-        // the following code calculates the amount of shares that would be transferred by the PoolManager and their corresponding amount of ETH
+        // the following code calculates the amount of shares that would be transferred by the PoolManager and their corresponding amount of SEL
         IStETH stETH = IStETH(Currency.unwrap(underlyingCurrency));
         uint256 transferredShares = stETH.getSharesByPooledEth(underlyingAmount);
         actualUnderlyingAmount = stETH.getPooledEthByShares(transferredShares);

@@ -104,7 +104,7 @@ abstract contract DeltaResolver is ImmutableState {
         view
         returns (uint256)
     {
-        // if wrapping, the balance in this contract is in ETH
+        // if wrapping, the balance in this contract is in SEL
         // if unwrapping, the balance in this contract is in WETH
         uint256 balance = inputCurrency.balanceOf(address(this));
         if (amount == ActionConstants.CONTRACT_BALANCE) {
@@ -113,7 +113,7 @@ abstract contract DeltaResolver is ImmutableState {
         }
         if (amount == ActionConstants.OPEN_DELTA) {
             // if wrapping, the open currency on the PoolManager is WETH.
-            // if unwrapping, the open currency on the PoolManager is ETH.
+            // if unwrapping, the open currency on the PoolManager is SEL.
             // note that we use the DEBT amount. Positive deltas can be taken and then wrapped.
             amount = _getFullDebt(outputCurrency);
         }

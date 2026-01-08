@@ -41,6 +41,6 @@ contract MockPositionDescriptor is IPositionDescriptor {
     }
 
     function nativeCurrencyLabel() external pure override returns (string memory) {
-        return "ETH";
+        return "SEL";
     }
 }

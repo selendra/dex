@@ -7,8 +7,8 @@ import {IPoolManager} from "../../core/interfaces/IPoolManager.sol";
 import {Currency, CurrencyLibrary} from "../../core/types/Currency.sol";
 
 /// @title Wrapped Ether Hook
-/// @notice Hook for wrapping/unwrapping ETH in Uniswap V4 pools
-/// @dev Implements 1:1 wrapping/unwrapping of ETH to WETH
+/// @notice Hook for wrapping/unwrapping SEL in Uniswap V4 pools
+/// @dev Implements 1:1 wrapping/unwrapping of SEL to WETH
 contract WETHHook is BaseTokenWrapperHook {
     /// @notice The WETH9 contract
     WETH public immutable weth;
@@ -20,7 +20,7 @@ contract WETHHook is BaseTokenWrapperHook {
         BaseTokenWrapperHook(
             _manager,
             Currency.wrap(_weth), // wrapper token is WETH
-            CurrencyLibrary.ADDRESS_ZERO // underlying token is ETH (address(0))
+            CurrencyLibrary.ADDRESS_ZERO // underlying token is SEL (address(0))
         )
     {
         weth = WETH(payable(_weth));
@@ -31,7 +31,7 @@ contract WETHHook is BaseTokenWrapperHook {
     function _deposit(uint256 underlyingAmount) internal override returns (uint256, uint256) {
         // Sync WETH on PoolManager
         poolManager.sync(wrapperCurrency);
-        // take ETH from PoolManager and deposit directly into the WETH contract
+        // take SEL from PoolManager and deposit directly into the WETH contract
         // this will mint WETH to msg.sender (PoolManager in this case)
         _take(underlyingCurrency, address(weth), underlyingAmount);
         // Settle on PoolManager which will take into account the new weth
@@ -43,12 +43,12 @@ contract WETHHook is BaseTokenWrapperHook {
     function _withdraw(uint256 wrapperAmount) internal override returns (uint256, uint256) {
         // take WETH into this hook contract
         _take(wrapperCurrency, address(this), wrapperAmount);
-        // Withdraw WETH - this returns ETH back to this hook contract
+        // Withdraw WETH - this returns SEL back to this hook contract
         weth.withdraw(wrapperAmount);
         _settle(underlyingCurrency, address(this), wrapperAmount);
         return (wrapperAmount, wrapperAmount); // 1:1 ratio
     }
 
-    /// @notice Required to receive ETH
+    /// @notice Required to receive SEL
     receive() external payable {}
 }
