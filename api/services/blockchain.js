@@ -112,10 +112,21 @@ class BlockchainService {
   async loadToken(tokenAddress) {
     if (!this.tokens[tokenAddress]) {
       const tokenABI = [
+        // View functions
+        'function name() view returns (string)',
+        'function symbol() view returns (string)',
+        'function decimals() view returns (uint8)',
+        'function totalSupply() view returns (uint256)',
         'function balanceOf(address) view returns (uint256)',
+        'function allowance(address owner, address spender) view returns (uint256)',
+        // State-changing functions
         'function transfer(address to, uint256 amount) returns (bool)',
         'function approve(address spender, uint256 amount) returns (bool)',
-        'function allowance(address owner, address spender) view returns (uint256)'
+        'function transferFrom(address from, address to, uint256 amount) returns (bool)',
+        // TestToken specific functions
+        'function mint(address to, uint256 amount)',
+        'function burn(uint256 amount)',
+        'function burnFrom(address account, uint256 amount)'
       ];
       this.tokens[tokenAddress] = new ethers.Contract(
         tokenAddress,
@@ -124,6 +135,199 @@ class BlockchainService {
       );
     }
     return this.tokens[tokenAddress];
+  }
+
+  /**
+   * Load token with a specific wallet (for user operations)
+   */
+  loadTokenWithWallet(tokenAddress, wallet) {
+    const tokenABI = [
+      'function name() view returns (string)',
+      'function symbol() view returns (string)',
+      'function decimals() view returns (uint8)',
+      'function totalSupply() view returns (uint256)',
+      'function balanceOf(address) view returns (uint256)',
+      'function allowance(address owner, address spender) view returns (uint256)',
+      'function transfer(address to, uint256 amount) returns (bool)',
+      'function approve(address spender, uint256 amount) returns (bool)',
+      'function transferFrom(address from, address to, uint256 amount) returns (bool)',
+      'function mint(address to, uint256 amount)',
+      'function burn(uint256 amount)',
+      'function burnFrom(address account, uint256 amount)'
+    ];
+    return new ethers.Contract(tokenAddress, tokenABI, wallet);
+  }
+
+  /**
+   * Get token metadata (name, symbol, decimals, totalSupply)
+   */
+  async getTokenInfo(tokenAddress) {
+    const token = await this.loadToken(tokenAddress);
+    const [name, symbol, decimals, totalSupply] = await Promise.all([
+      token.name(),
+      token.symbol(),
+      token.decimals(),
+      token.totalSupply()
+    ]);
+    return {
+      address: tokenAddress,
+      name,
+      symbol,
+      decimals: Number(decimals),
+      totalSupply: ethers.formatUnits(totalSupply, decimals)
+    };
+  }
+
+  /**
+   * Transfer tokens from user's wallet
+   */
+  async transferToken(userWallet, tokenAddress, toAddress, amount) {
+    const token = this.loadTokenWithWallet(tokenAddress, userWallet);
+    const decimals = await token.decimals();
+    const amountWei = ethers.parseUnits(amount.toString(), decimals);
+    
+    const tx = await token.transfer(toAddress, amountWei);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      from: userWallet.address,
+      to: toAddress,
+      amount: amount.toString(),
+      tokenAddress,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Approve spender to spend tokens
+   */
+  async approveToken(userWallet, tokenAddress, spenderAddress, amount) {
+    const token = this.loadTokenWithWallet(tokenAddress, userWallet);
+    const decimals = await token.decimals();
+    const amountWei = ethers.parseUnits(amount.toString(), decimals);
+    
+    const tx = await token.approve(spenderAddress, amountWei);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      owner: userWallet.address,
+      spender: spenderAddress,
+      amount: amount.toString(),
+      tokenAddress,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Get allowance
+   */
+  async getAllowance(tokenAddress, ownerAddress, spenderAddress) {
+    const token = await this.loadToken(tokenAddress);
+    const decimals = await token.decimals();
+    const allowance = await token.allowance(ownerAddress, spenderAddress);
+    return {
+      tokenAddress,
+      owner: ownerAddress,
+      spender: spenderAddress,
+      allowance: ethers.formatUnits(allowance, decimals)
+    };
+  }
+
+  /**
+   * Transfer tokens from another address (requires allowance)
+   */
+  async transferFromToken(userWallet, tokenAddress, fromAddress, toAddress, amount) {
+    const token = this.loadTokenWithWallet(tokenAddress, userWallet);
+    const decimals = await token.decimals();
+    const amountWei = ethers.parseUnits(amount.toString(), decimals);
+    
+    const tx = await token.transferFrom(fromAddress, toAddress, amountWei);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      from: fromAddress,
+      to: toAddress,
+      amount: amount.toString(),
+      tokenAddress,
+      caller: userWallet.address,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Burn tokens from user's own balance
+   */
+  async burnToken(userWallet, tokenAddress, amount) {
+    const token = this.loadTokenWithWallet(tokenAddress, userWallet);
+    const decimals = await token.decimals();
+    const amountWei = ethers.parseUnits(amount.toString(), decimals);
+    
+    // Check balance first
+    const balance = await token.balanceOf(userWallet.address);
+    if (balance < amountWei) {
+      throw new Error(`Insufficient balance. Have: ${ethers.formatUnits(balance, decimals)}, Need: ${amount}`);
+    }
+    
+    const tx = await token.burn(amountWei);
+    const receipt = await tx.wait();
+    
+    const newBalance = await token.balanceOf(userWallet.address);
+    
+    return {
+      txHash: tx.hash,
+      burner: userWallet.address,
+      amount: amount.toString(),
+      tokenAddress,
+      newBalance: ethers.formatUnits(newBalance, decimals),
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Burn tokens from another address (requires allowance)
+   */
+  async burnFromToken(userWallet, tokenAddress, fromAddress, amount) {
+    const token = this.loadTokenWithWallet(tokenAddress, userWallet);
+    const decimals = await token.decimals();
+    const amountWei = ethers.parseUnits(amount.toString(), decimals);
+    
+    const tx = await token.burnFrom(fromAddress, amountWei);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      from: fromAddress,
+      caller: userWallet.address,
+      amount: amount.toString(),
+      tokenAddress,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Mint tokens (TestToken specific - no access control)
+   */
+  async mintToken(userWallet, tokenAddress, toAddress, amount) {
+    const token = this.loadTokenWithWallet(tokenAddress, userWallet);
+    const decimals = await token.decimals();
+    const amountWei = ethers.parseUnits(amount.toString(), decimals);
+    
+    const tx = await token.mint(toAddress, amountWei);
+    const receipt = await tx.wait();
+    
+    const newBalance = await token.balanceOf(toAddress);
+    
+    return {
+      txHash: tx.hash,
+      to: toAddress,
+      amount: amount.toString(),
+      tokenAddress,
+      newBalance: ethers.formatUnits(newBalance, decimals),
+      gasUsed: receipt.gasUsed.toString()
+    };
   }
 
   sortTokens(token0Addr, token1Addr) {

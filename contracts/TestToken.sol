@@ -9,7 +9,24 @@ contract TestToken is ERC20 {
         _mint(msg.sender, 1_000_000 * 10**18); // 1 million tokens
     }
 
+    /// @notice Mint new tokens (for testing purposes)
+    /// @param to Address to receive tokens
+    /// @param amount Amount to mint
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
+    }
+
+    /// @notice Burn tokens from caller's balance
+    /// @param amount Amount to burn
+    function burn(uint256 amount) external {
+        _burn(msg.sender, amount);
+    }
+
+    /// @notice Burn tokens from a specified account (requires allowance)
+    /// @param account Address to burn from
+    /// @param amount Amount to burn
+    function burnFrom(address account, uint256 amount) external {
+        _spendAllowance(account, msg.sender, amount);
+        _burn(account, amount);
     }
 }

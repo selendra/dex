@@ -5,6 +5,7 @@ const authRoutes = require('./routes/auth');
 const swapRoutes = require('./routes/swap');
 const liquidityRoutes = require('./routes/liquidity');
 const poolRoutes = require('./routes/pool');
+const tokenRoutes = require('./routes/token');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/swap', swapRoutes);
 app.use('/api/liquidity', liquidityRoutes);
 app.use('/api/pool', poolRoutes);
+app.use('/api/token', tokenRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
