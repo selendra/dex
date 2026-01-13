@@ -432,6 +432,50 @@ class BlockchainService {
     }
   }
 
+  /**
+   * Initialize pool with user's wallet (user pays gas)
+   */
+  async initializePoolWithWallet(userWallet, token0Addr, token1Addr, priceRatio = null) {
+    try {
+      const poolKey = this.createPoolKey(token0Addr, token1Addr);
+      
+      // If priceRatio provided, convert to sqrtPriceX96, otherwise use 1:1
+      let sqrtPriceX96;
+      if (priceRatio !== null && priceRatio !== undefined) {
+        sqrtPriceX96 = this.priceToSqrtPriceX96(priceRatio);
+      } else {
+        sqrtPriceX96 = this.SQRT_PRICE_1_1;
+      }
+      
+      // Connect PoolManager with user's wallet
+      const poolManagerWithWallet = this.poolManager.connect(userWallet);
+      
+      const tx = await poolManagerWithWallet.initialize(poolKey, sqrtPriceX96);
+      const receipt = await tx.wait();
+      
+      if (receipt.status === 0) {
+        throw new Error('Pool initialization transaction reverted');
+      }
+      
+      return { 
+        poolKey, 
+        txHash: tx.hash,
+        priceRatio: priceRatio || 1,
+        sqrtPriceX96,
+        gasUsed: receipt.gasUsed.toString()
+      };
+    } catch (error) {
+      // Check for common pool initialization errors
+      if (error.message.includes('PoolAlreadyInitialized') || 
+          error.message.includes('already initialized') ||
+          error.message.includes('ALREADY_INITIALIZED')) {
+        throw new Error('Pool has already been initialized. Each pool can only be initialized once.');
+      }
+      
+      throw error;
+    }
+  }
+
   async addLiquidity(token0Addr, token1Addr, amount0, amount1, tickLower = null, tickUpper = null) {
     const poolKey = this.createPoolKey(token0Addr, token1Addr);
     const lmAddr = await this.liquidityManager.getAddress();

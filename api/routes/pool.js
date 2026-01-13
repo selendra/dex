@@ -9,7 +9,7 @@ const blockchainService = require('../services/blockchain');
  *   token0: "0x...",
  *   token1: "0x...",
  *   priceRatio: 1 (optional, e.g., 1 for 1:1, 10 for 10:1, 0.5 for 1:2),
- *   privateKey: "0x..." (optional - for logging purposes)
+ *   privateKey: "0x..." (required - user pays gas)
  * }
  */
 router.post('/initialize', async (req, res, next) => {
@@ -17,12 +17,15 @@ router.post('/initialize', async (req, res, next) => {
     const { token0, token1, priceRatio, privateKey } = req.body;
     
     // Validate input
-    if (!token0 || !token1) {
+    if (!token0 || !token1 || !privateKey) {
       return res.status(400).json({
         error: 'Missing required fields',
-        required: ['token0', 'token1']
+        required: ['token0', 'token1', 'privateKey']
       });
     }
+    
+    // Create wallet from private key
+    const userWallet = blockchainService.createWalletFromPrivateKey(privateKey);
     
     // Validate price ratio if provided
     if (priceRatio !== undefined && priceRatio !== null && priceRatio <= 0) {
@@ -32,29 +35,20 @@ router.post('/initialize', async (req, res, next) => {
       });
     }
     
-    // Initialize pool
-    const result = await blockchainService.initializePool(
+    // Initialize pool with user's wallet
+    const result = await blockchainService.initializePoolWithWallet(
+      userWallet,
       token0,
       token1,
       priceRatio
     );
-    
-    // Add caller info if private key provided
-    let caller = null;
-    if (privateKey) {
-      try {
-        caller = blockchainService.getAddressFromPrivateKey(privateKey);
-      } catch (e) {
-        // Ignore invalid private key
-      }
-    }
     
     res.json({
       success: true,
       message: 'Pool initialized successfully',
       data: {
         ...result,
-        caller
+        caller: userWallet.address
       }
     });
   } catch (error) {

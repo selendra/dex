@@ -69,20 +69,12 @@ You should see output like:
 
 This API uses **direct private key authentication** - no JWT tokens or user registration required. Simply include your private key in the request body for write operations.
 
+### DEX Operations
+
 | Endpoint | Method | Requires Private Key | Description |
 |----------|--------|---------------------|-------------|
 | `/health` | GET | No | Health check |
-| `/api/token/:addr/info` | GET | No | Get token metadata |
-| `/api/token/:addr/balance/:account` | GET | No | Get token balance |
-| `/api/token/:addr/allowance/:owner/:spender` | GET | No | Get token allowance |
-| `/api/token/balances` | POST | Yes (optional) | Get multiple token balances |
-| `/api/token/transfer` | POST | Yes | Transfer tokens |
-| `/api/token/approve` | POST | Yes | Approve spender |
-| `/api/token/transferFrom` | POST | Yes | Transfer using allowance |
-| `/api/token/burn` | POST | Yes | Burn own tokens |
-| `/api/token/burnFrom` | POST | Yes | Burn from address |
-| `/api/token/mint` | POST | Yes | Mint new tokens |
-| `/api/pool/initialize` | POST | No | Initialize a new pool |
+| `/api/pool/initialize` | POST | Yes | Initialize a new pool |
 | `/api/pool/:token0/:token1` | GET | No | Get pool information |
 | `/api/pool/list` | POST | No | Get multiple pools info |
 | `/api/pool/token/:addr/balance` | GET | No | Get token balance (default signer) |
@@ -93,6 +85,21 @@ This API uses **direct private key authentication** - no JWT tokens or user regi
 | `/api/liquidity/add` | POST | Yes | Add liquidity |
 | `/api/liquidity/remove` | POST | Yes | Remove liquidity |
 | `/api/liquidity/:token0/:token1` | GET | No | Get pool liquidity info |
+
+### Token Operations (ERC20)
+
+| Endpoint | Method | Requires Private Key | Description |
+|----------|--------|---------------------|-------------|
+| `/api/token/:addr/info` | GET | No | Get token metadata |
+| `/api/token/:addr/balance/:account` | GET | No | Get token balance |
+| `/api/token/:addr/allowance/:owner/:spender` | GET | No | Get token allowance |
+| `/api/token/balances` | POST | Yes (optional) | Get multiple token balances |
+| `/api/token/transfer` | POST | Yes | Transfer tokens |
+| `/api/token/approve` | POST | Yes | Approve spender |
+| `/api/token/transferFrom` | POST | Yes | Transfer using allowance |
+| `/api/token/burn` | POST | Yes | Burn own tokens |
+| `/api/token/burnFrom` | POST | Yes | Burn from address |
+| `/api/token/mint` | POST | Yes | Mint new tokens |
 
 ---
 
@@ -116,159 +123,9 @@ curl http://localhost:3000/health
 
 ---
 
-### 2. Token Operations
+### 2. Pool Operations
 
-#### 2.1 Get Token Info
-
-**Purpose:** Get token metadata (name, symbol, decimals, totalSupply).
-
-```bash
-curl "http://localhost:3000/api/token/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/info"
-```
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "address": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
-    "name": "Test USD",
-    "symbol": "TUSD",
-    "decimals": 18,
-    "totalSupply": "2000000.0"
-  }
-}
-```
-
-#### 2.2 Get Token Balance
-
-```bash
-curl "http://localhost:3000/api/token/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/balance/0x725f3F18b27A94df1a4901bbfb7561Dc3B248481"
-```
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
-    "accountAddress": "0x725f3F18b27A94df1a4901bbfb7561Dc3B248481",
-    "balance": "1633890.0"
-  }
-}
-```
-
-#### 2.3 Get Token Allowance
-
-```bash
-curl "http://localhost:3000/api/token/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/allowance/0x725f3F18b27A94df1a4901bbfb7561Dc3B248481/0x92B4C76AB36D52deD3Da20aE91820D078Ab97C5c"
-```
-
-#### 2.4 Get Multiple Token Balances
-
-```bash
-curl -X POST http://localhost:3000/api/token/balances \
-  -H "Content-Type: application/json" \
-  -d '{
-    "privateKey": "0xYOUR_PRIVATE_KEY",
-    "tokens": [
-      "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
-      "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4"
-    ]
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "address": "0x725f3F18b27A94df1a4901bbfb7561Dc3B248481",
-    "native": "7.7547641419",
-    "tokens": {
-      "0xA9233751245AFB7420B6AE108dF94E63418aD4d9": "1633890.0",
-      "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4": "1643900.0"
-    }
-  }
-}
-```
-
-#### 2.5 Transfer Tokens
-
-```bash
-curl -X POST http://localhost:3000/api/token/transfer \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
-    "toAddress": "0xRECIPIENT_ADDRESS",
-    "amount": "100",
-    "privateKey": "0xYOUR_PRIVATE_KEY"
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "message": "Transfer successful",
-  "data": {
-    "txHash": "0x...",
-    "from": "0x...",
-    "to": "0x...",
-    "amount": "100",
-    "tokenAddress": "0x...",
-    "gasUsed": "51066"
-  }
-}
-```
-
-#### 2.6 Approve Spender
-
-```bash
-curl -X POST http://localhost:3000/api/token/approve \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
-    "spenderAddress": "0x92B4C76AB36D52deD3Da20aE91820D078Ab97C5c",
-    "amount": "1000",
-    "privateKey": "0xYOUR_PRIVATE_KEY"
-  }'
-```
-
-#### 2.7 Burn Tokens
-
-**Purpose:** Burn tokens from your own balance.
-
-```bash
-curl -X POST http://localhost:3000/api/token/burn \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
-    "amount": "100",
-    "privateKey": "0xYOUR_PRIVATE_KEY"
-  }'
-```
-
-#### 2.8 Mint Tokens
-
-**Purpose:** Mint new tokens (TestToken has no access control).
-
-```bash
-curl -X POST http://localhost:3000/api/token/mint \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
-    "toAddress": "0xRECIPIENT_ADDRESS",
-    "amount": "1000",
-    "privateKey": "0xYOUR_PRIVATE_KEY"
-  }'
-```
-
----
-
-### 3. Pool Operations
-
-#### 3.1 Initialize a Pool
+#### 2.1 Initialize a Pool
 
 **Purpose:** Create a new liquidity pool for a token pair.
 
@@ -278,7 +135,8 @@ curl -X POST http://localhost:3000/api/pool/initialize \
   -d '{
     "token0": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
     "token1": "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4",
-    "priceRatio": 1
+    "priceRatio": 1,
+    "privateKey": "0xYOUR_PRIVATE_KEY"
   }'
 ```
 
@@ -286,6 +144,7 @@ curl -X POST http://localhost:3000/api/pool/initialize \
 - `token0`: First token address
 - `token1`: Second token address
 - `priceRatio` (optional): Initial price ratio (1 = 1:1, 10 = 10:1, 0.5 = 1:2)
+- `privateKey`: Your wallet private key (pays gas)
 
 **Expected Response:**
 ```json
@@ -302,12 +161,14 @@ curl -X POST http://localhost:3000/api/pool/initialize \
     },
     "txHash": "0x...",
     "priceRatio": 1,
-    "sqrtPriceX96": "79228162514264337593543950336"
+    "sqrtPriceX96": "79228162514264337593543950336",
+    "gasUsed": "123456",
+    "caller": "0x..."
   }
 }
 ```
 
-#### 3.2 Get Pool Information
+#### 2.2 Get Pool Information
 
 **Purpose:** Retrieve pool state (price, liquidity, etc.).
 
@@ -331,7 +192,7 @@ curl "http://localhost:3000/api/pool/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/
 }
 ```
 
-#### 3.3 List Multiple Pools
+#### 2.3 List Multiple Pools
 
 ```bash
 curl -X POST http://localhost:3000/api/pool/list \
@@ -345,7 +206,7 @@ curl -X POST http://localhost:3000/api/pool/list \
   }'
 ```
 
-#### 3.4 Get Token Balance
+#### 2.4 Get Token Balance
 
 ```bash
 # Default signer balance
@@ -357,9 +218,9 @@ curl "http://localhost:3000/api/pool/token/0xA9233751245AFB7420B6AE108dF94E63418
 
 ---
 
-### 4. Swap Operations
+### 3. Swap Operations
 
-#### 4.1 Get Swap Quote
+#### 3.1 Get Swap Quote
 
 **Purpose:** Calculate expected output before executing a swap.
 
@@ -392,7 +253,7 @@ curl -X POST http://localhost:3000/api/swap/quote \
 }
 ```
 
-#### 4.2 Execute Swap
+#### 3.2 Execute Swap
 
 **Purpose:** Perform the actual token swap.
 
@@ -437,7 +298,7 @@ curl -X POST http://localhost:3000/api/swap \
 }
 ```
 
-#### 4.3 Get User Balances
+#### 3.3 Get User Balances
 
 ```bash
 curl -X POST http://localhost:3000/api/swap/balances \
@@ -469,9 +330,9 @@ curl -X POST http://localhost:3000/api/swap/balances \
 
 ---
 
-### 5. Liquidity Operations
+### 4. Liquidity Operations
 
-#### 5.1 Add Liquidity
+#### 4.1 Add Liquidity
 
 **Purpose:** Provide liquidity to a pool.
 
@@ -509,7 +370,7 @@ curl -X POST http://localhost:3000/api/liquidity/add \
 }
 ```
 
-#### 5.2 Remove Liquidity
+#### 4.2 Remove Liquidity
 
 ```bash
 curl -X POST http://localhost:3000/api/liquidity/remove \
@@ -536,10 +397,160 @@ curl -X POST http://localhost:3000/api/liquidity/remove \
 }
 ```
 
-#### 5.3 Get Pool Liquidity Info
+#### 4.3 Get Pool Liquidity Info
 
 ```bash
 curl "http://localhost:3000/api/liquidity/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4"
+```
+
+---
+
+### 5. Token Operations (ERC20)
+
+#### 5.1 Get Token Info
+
+**Purpose:** Get token metadata (name, symbol, decimals, totalSupply).
+
+```bash
+curl "http://localhost:3000/api/token/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/info"
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "address": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+    "name": "Test USD",
+    "symbol": "TUSD",
+    "decimals": 18,
+    "totalSupply": "2000000.0"
+  }
+}
+```
+
+#### 5.2 Get Token Balance
+
+```bash
+curl "http://localhost:3000/api/token/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/balance/0x725f3F18b27A94df1a4901bbfb7561Dc3B248481"
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+    "accountAddress": "0x725f3F18b27A94df1a4901bbfb7561Dc3B248481",
+    "balance": "1633890.0"
+  }
+}
+```
+
+#### 5.3 Get Token Allowance
+
+```bash
+curl "http://localhost:3000/api/token/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/allowance/0x725f3F18b27A94df1a4901bbfb7561Dc3B248481/0x92B4C76AB36D52deD3Da20aE91820D078Ab97C5c"
+```
+
+#### 5.4 Get Multiple Token Balances
+
+```bash
+curl -X POST http://localhost:3000/api/token/balances \
+  -H "Content-Type: application/json" \
+  -d '{
+    "privateKey": "0xYOUR_PRIVATE_KEY",
+    "tokens": [
+      "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+      "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4"
+    ]
+  }'
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "address": "0x725f3F18b27A94df1a4901bbfb7561Dc3B248481",
+    "native": "7.7547641419",
+    "tokens": {
+      "0xA9233751245AFB7420B6AE108dF94E63418aD4d9": "1633890.0",
+      "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4": "1643900.0"
+    }
+  }
+}
+```
+
+#### 5.5 Transfer Tokens
+
+```bash
+curl -X POST http://localhost:3000/api/token/transfer \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+    "toAddress": "0xRECIPIENT_ADDRESS",
+    "amount": "100",
+    "privateKey": "0xYOUR_PRIVATE_KEY"
+  }'
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "message": "Transfer successful",
+  "data": {
+    "txHash": "0x...",
+    "from": "0x...",
+    "to": "0x...",
+    "amount": "100",
+    "tokenAddress": "0x...",
+    "gasUsed": "51066"
+  }
+}
+```
+
+#### 5.6 Approve Spender
+
+```bash
+curl -X POST http://localhost:3000/api/token/approve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+    "spenderAddress": "0x92B4C76AB36D52deD3Da20aE91820D078Ab97C5c",
+    "amount": "1000",
+    "privateKey": "0xYOUR_PRIVATE_KEY"
+  }'
+```
+
+#### 5.7 Burn Tokens
+
+**Purpose:** Burn tokens from your own balance.
+
+```bash
+curl -X POST http://localhost:3000/api/token/burn \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+    "amount": "100",
+    "privateKey": "0xYOUR_PRIVATE_KEY"
+  }'
+```
+
+#### 5.8 Mint Tokens
+
+**Purpose:** Mint new tokens (TestToken has no access control).
+
+```bash
+curl -X POST http://localhost:3000/api/token/mint \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+    "toAddress": "0xRECIPIENT_ADDRESS",
+    "amount": "1000",
+    "privateKey": "0xYOUR_PRIVATE_KEY"
+  }'
 ```
 
 ---
@@ -604,7 +615,8 @@ Create a Postman environment with:
 {
   "token0": "{{tusd_address}}",
   "token1": "{{tbrown_address}}",
-  "priceRatio": 1
+  "priceRatio": 1,
+  "privateKey": "{{private_key}}"
 }
 ```
 
