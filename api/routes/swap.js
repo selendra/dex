@@ -168,4 +168,116 @@ router.post('/balances', async (req, res, next) => {
   }
 });
 
+/**
+ * POST /api/swap/admin/pause
+ * Pause swaps (admin only)
+ * Body: {
+ *   privateKey: "0x..." (admin's private key)
+ * }
+ */
+router.post('/admin/pause', async (req, res, next) => {
+  try {
+    const { privateKey } = req.body;
+    
+    if (!privateKey) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['privateKey']
+      });
+    }
+    
+    const result = await blockchainService.pauseSwaps(privateKey);
+    
+    res.json({
+      success: true,
+      message: 'Swaps paused successfully',
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/swap/admin/unpause
+ * Unpause swaps (admin only)
+ * Body: {
+ *   privateKey: "0x..." (admin's private key)
+ * }
+ */
+router.post('/admin/unpause', async (req, res, next) => {
+  try {
+    const { privateKey } = req.body;
+    
+    if (!privateKey) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['privateKey']
+      });
+    }
+    
+    const result = await blockchainService.unpauseSwaps(privateKey);
+    
+    res.json({
+      success: true,
+      message: 'Swaps unpaused successfully',
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/swap/admin/status
+ * Get swap router status (paused state and admin)
+ */
+router.get('/admin/status', async (req, res, next) => {
+  try {
+    const paused = await blockchainService.isSwapsPaused();
+    const admin = await blockchainService.getSwapAdmin();
+    
+    res.json({
+      success: true,
+      data: {
+        paused,
+        admin
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/swap/admin/transfer
+ * Transfer swap router admin role (admin only)
+ * Body: {
+ *   newAdmin: "0x...",
+ *   privateKey: "0x..." (current admin's private key)
+ * }
+ */
+router.post('/admin/transfer', async (req, res, next) => {
+  try {
+    const { newAdmin, privateKey } = req.body;
+    
+    if (!newAdmin || !privateKey) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['newAdmin', 'privateKey']
+      });
+    }
+    
+    const result = await blockchainService.transferSwapAdmin(privateKey, newAdmin);
+    
+    res.json({
+      success: true,
+      message: 'Swap admin transferred successfully',
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;

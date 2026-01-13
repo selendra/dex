@@ -434,6 +434,7 @@ class BlockchainService {
 
   /**
    * Initialize pool with user's wallet (user pays gas)
+   * Uses LiquidityManager for admin-controlled pool initialization
    */
   async initializePoolWithWallet(userWallet, token0Addr, token1Addr, priceRatio = null) {
     try {
@@ -447,10 +448,10 @@ class BlockchainService {
         sqrtPriceX96 = this.SQRT_PRICE_1_1;
       }
       
-      // Connect PoolManager with user's wallet
-      const poolManagerWithWallet = this.poolManager.connect(userWallet);
+      // Connect LiquidityManager with user's wallet for admin-controlled initialization
+      const liquidityManagerWithWallet = this.liquidityManager.connect(userWallet);
       
-      const tx = await poolManagerWithWallet.initialize(poolKey, sqrtPriceX96);
+      const tx = await liquidityManagerWithWallet.initializePool(poolKey, sqrtPriceX96);
       const receipt = await tx.wait();
       
       if (receipt.status === 0) {
@@ -470,6 +471,12 @@ class BlockchainService {
           error.message.includes('already initialized') ||
           error.message.includes('ALREADY_INITIALIZED')) {
         throw new Error('Pool has already been initialized. Each pool can only be initialized once.');
+      }
+      
+      // Check for admin authorization errors
+      if (error.message.includes('NotAuthorized') || 
+          error.message.includes('NotAdmin')) {
+        throw new Error('Not authorized to initialize pools. Only admin or authorized addresses can initialize pools.');
       }
       
       throw error;
@@ -872,6 +879,132 @@ class BlockchainService {
     }
 
     return balances;
+  }
+
+  // ========== Admin Functions for LiquidityManager ==========
+
+  /**
+   * Set authorized initializer (admin only)
+   */
+  async setAuthorizedInitializer(adminPrivateKey, account, authorized) {
+    const adminWallet = this.createWalletFromPrivateKey(adminPrivateKey);
+    const liquidityManagerWithAdmin = this.liquidityManager.connect(adminWallet);
+    
+    const tx = await liquidityManagerWithAdmin.setAuthorizedInitializer(account, authorized);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      account,
+      authorized,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Check if an address is authorized to initialize pools
+   */
+  async isAuthorizedInitializer(account) {
+    const isAuthorized = await this.liquidityManager.authorizedInitializers(account);
+    return isAuthorized;
+  }
+
+  /**
+   * Get current pool admin address
+   */
+  async getPoolAdmin() {
+    const admin = await this.liquidityManager.admin();
+    return admin;
+  }
+
+  /**
+   * Transfer pool admin role (admin only)
+   */
+  async transferPoolAdmin(adminPrivateKey, newAdmin) {
+    const adminWallet = this.createWalletFromPrivateKey(adminPrivateKey);
+    const liquidityManagerWithAdmin = this.liquidityManager.connect(adminWallet);
+    
+    const oldAdmin = await this.liquidityManager.admin();
+    const tx = await liquidityManagerWithAdmin.setAdmin(newAdmin);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      oldAdmin,
+      newAdmin,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  // ========== Admin Functions for SwapRouter ==========
+
+  /**
+   * Pause swaps (admin only)
+   */
+  async pauseSwaps(adminPrivateKey) {
+    const adminWallet = this.createWalletFromPrivateKey(adminPrivateKey);
+    const swapRouterWithAdmin = this.swapRouter.connect(adminWallet);
+    
+    const tx = await swapRouterWithAdmin.pause();
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      paused: true,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Unpause swaps (admin only)
+   */
+  async unpauseSwaps(adminPrivateKey) {
+    const adminWallet = this.createWalletFromPrivateKey(adminPrivateKey);
+    const swapRouterWithAdmin = this.swapRouter.connect(adminWallet);
+    
+    const tx = await swapRouterWithAdmin.unpause();
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      paused: false,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Check if swaps are paused
+   */
+  async isSwapsPaused() {
+    const paused = await this.swapRouter.paused();
+    return paused;
+  }
+
+  /**
+   * Get swap router admin
+   */
+  async getSwapAdmin() {
+    const admin = await this.swapRouter.admin();
+    return admin;
+  }
+
+  /**
+   * Transfer swap router admin role
+   */
+  async transferSwapAdmin(adminPrivateKey, newAdmin) {
+    const adminWallet = this.createWalletFromPrivateKey(adminPrivateKey);
+    const swapRouterWithAdmin = this.swapRouter.connect(adminWallet);
+    
+    const oldAdmin = await this.swapRouter.admin();
+    const tx = await swapRouterWithAdmin.setAdmin(newAdmin);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      oldAdmin,
+      newAdmin,
+      gasUsed: receipt.gasUsed.toString()
+    };
   }
 }
 

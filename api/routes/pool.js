@@ -156,4 +156,92 @@ router.get('/token/:tokenAddress/balance/:accountAddress', async (req, res, next
   }
 });
 
+/**
+ * POST /api/pool/admin/authorize
+ * Authorize an address to initialize pools (admin only)
+ * Body: {
+ *   account: "0x...",
+ *   authorized: true/false,
+ *   privateKey: "0x..." (admin's private key)
+ * }
+ */
+router.post('/admin/authorize', async (req, res, next) => {
+  try {
+    const { account, authorized, privateKey } = req.body;
+    
+    if (!account || authorized === undefined || !privateKey) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['account', 'authorized', 'privateKey']
+      });
+    }
+    
+    const result = await blockchainService.setAuthorizedInitializer(privateKey, account, authorized);
+    
+    res.json({
+      success: true,
+      message: `Address ${authorized ? 'authorized' : 'revoked'} successfully`,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/pool/admin/check/:account
+ * Check if an address is authorized to initialize pools
+ */
+router.get('/admin/check/:account', async (req, res, next) => {
+  try {
+    const { account } = req.params;
+    
+    const isAuthorized = await blockchainService.isAuthorizedInitializer(account);
+    const admin = await blockchainService.getPoolAdmin();
+    
+    res.json({
+      success: true,
+      data: {
+        account,
+        isAuthorized,
+        isAdmin: account.toLowerCase() === admin.toLowerCase(),
+        admin
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/pool/admin/transfer
+ * Transfer admin role to a new address (admin only)
+ * Body: {
+ *   newAdmin: "0x...",
+ *   privateKey: "0x..." (current admin's private key)
+ * }
+ */
+router.post('/admin/transfer', async (req, res, next) => {
+  try {
+    const { newAdmin, privateKey } = req.body;
+    
+    if (!newAdmin || !privateKey) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['newAdmin', 'privateKey']
+      });
+    }
+    
+    const result = await blockchainService.transferPoolAdmin(privateKey, newAdmin);
+    
+    res.json({
+      success: true,
+      message: 'Admin transferred successfully',
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;
