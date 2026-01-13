@@ -37,7 +37,7 @@ SELENDRA_TBROWN_ADDRESS=0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4
 SELENDRA_TSMART_ADDRESS=0x3F35Ff1a1C3AbfBc916dECde3DC08b2bFFFe8900
 SELENDRA_TZANDO_ADDRESS=0x2c0832A61271eA2E989B90202219ffB630c00901
 
-# Private Key (for blockchain service)
+# Private Key (for blockchain service default signer)
 PRIVATE_KEY=your_private_key_here
 ```
 
@@ -67,23 +67,31 @@ You should see output like:
 
 ## API Overview
 
-| Endpoint | Method | Auth Required | Description |
-|----------|--------|---------------|-------------|
+This API uses **direct private key authentication** - no JWT tokens or user registration required. Simply include your private key in the request body for write operations.
+
+| Endpoint | Method | Requires Private Key | Description |
+|----------|--------|---------------------|-------------|
 | `/health` | GET | No | Health check |
-| `/api/auth/register` | POST | No | Register new user |
-| `/api/auth/login` | POST | No | Login and get JWT token |
-| `/api/auth/me` | GET | Yes | Get current user info |
-| `/api/auth/wallet` | POST | Yes | Get wallet details |
-| `/api/auth/users` | GET | No | List all users |
-| `/api/pool/initialize` | POST | Admin | Initialize a new pool |
+| `/api/token/:addr/info` | GET | No | Get token metadata |
+| `/api/token/:addr/balance/:account` | GET | No | Get token balance |
+| `/api/token/:addr/allowance/:owner/:spender` | GET | No | Get token allowance |
+| `/api/token/balances` | POST | Yes (optional) | Get multiple token balances |
+| `/api/token/transfer` | POST | Yes | Transfer tokens |
+| `/api/token/approve` | POST | Yes | Approve spender |
+| `/api/token/transferFrom` | POST | Yes | Transfer using allowance |
+| `/api/token/burn` | POST | Yes | Burn own tokens |
+| `/api/token/burnFrom` | POST | Yes | Burn from address |
+| `/api/token/mint` | POST | Yes | Mint new tokens |
+| `/api/pool/initialize` | POST | No | Initialize a new pool |
 | `/api/pool/:token0/:token1` | GET | No | Get pool information |
 | `/api/pool/list` | POST | No | Get multiple pools info |
-| `/api/pool/token/:addr/balance` | GET | No | Get token balance |
+| `/api/pool/token/:addr/balance` | GET | No | Get token balance (default signer) |
+| `/api/pool/token/:addr/balance/:account` | GET | No | Get token balance (specific account) |
 | `/api/swap` | POST | Yes | Execute token swap |
-| `/api/swap/quote` | POST | Optional | Get swap quote |
-| `/api/swap/balances` | GET | Yes | Get user balances |
-| `/api/liquidity/add` | POST | Admin | Add liquidity |
-| `/api/liquidity/remove` | POST | Admin | Remove liquidity |
+| `/api/swap/quote` | POST | No (optional for balances) | Get swap quote |
+| `/api/swap/balances` | POST | Yes | Get user balances |
+| `/api/liquidity/add` | POST | Yes | Add liquidity |
+| `/api/liquidity/remove` | POST | Yes | Remove liquidity |
 | `/api/liquidity/:token0/:token1` | GET | No | Get pool liquidity info |
 
 ---
@@ -108,118 +116,165 @@ curl http://localhost:3000/health
 
 ---
 
-### 2. Authentication
+### 2. Token Operations
 
-#### 2.1 Register a New User
+#### 2.1 Get Token Info
 
-**Purpose:** Create a new user account with an auto-generated wallet.
+**Purpose:** Get token metadata (name, symbol, decimals, totalSupply).
 
 ```bash
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "alice",
-    "password": "securepassword123"
-  }'
+curl "http://localhost:3000/api/token/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/info"
 ```
 
 **Expected Response:**
 ```json
 {
   "success": true,
-  "message": "User registered successfully",
   "data": {
-    "username": "alice",
-    "address": "0x...",
-    "role": "user",
-    "mnemonic": "word1 word2 word3 ... word12",
-    "token": "eyJhbGciOiJIUzI1NiIs..."
-  },
-  "warning": "Save your mnemonic phrase securely! It will not be shown again."
-}
-```
-
-> ⚠️ **Important:** Save the `mnemonic` and `token` from the response!
-
-#### 2.2 Register Admin User (First User Only)
-
-```bash
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin",
-    "password": "adminpassword123",
-    "adminSecret": "your-admin-secret"
-  }'
-```
-
-#### 2.3 Login
-
-**Purpose:** Authenticate and get a new JWT token.
-
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "alice",
-    "password": "securepassword123"
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "message": "Login successful",
-  "data": {
-    "username": "alice",
-    "address": "0x...",
-    "role": "user",
-    "token": "eyJhbGciOiJIUzI1NiIs..."
+    "address": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+    "name": "Test USD",
+    "symbol": "TUSD",
+    "decimals": 18,
+    "totalSupply": "2000000.0"
   }
 }
 ```
 
-#### 2.4 Get Current User Info
-
-**Purpose:** Verify authentication is working.
+#### 2.2 Get Token Balance
 
 ```bash
-curl http://localhost:3000/api/auth/me \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+curl "http://localhost:3000/api/token/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/balance/0x725f3F18b27A94df1a4901bbfb7561Dc3B248481"
 ```
 
-#### 2.5 Get Wallet Details
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+    "accountAddress": "0x725f3F18b27A94df1a4901bbfb7561Dc3B248481",
+    "balance": "1633890.0"
+  }
+}
+```
 
-**Purpose:** Retrieve wallet address and mnemonic (requires password).
+#### 2.3 Get Token Allowance
 
 ```bash
-curl -X POST http://localhost:3000/api/auth/wallet \
+curl "http://localhost:3000/api/token/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/allowance/0x725f3F18b27A94df1a4901bbfb7561Dc3B248481/0x92B4C76AB36D52deD3Da20aE91820D078Ab97C5c"
+```
+
+#### 2.4 Get Multiple Token Balances
+
+```bash
+curl -X POST http://localhost:3000/api/token/balances \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
-    "password": "securepassword123"
+    "privateKey": "0xYOUR_PRIVATE_KEY",
+    "tokens": [
+      "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+      "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4"
+    ]
   }'
 ```
 
-#### 2.6 List All Users
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "address": "0x725f3F18b27A94df1a4901bbfb7561Dc3B248481",
+    "native": "7.7547641419",
+    "tokens": {
+      "0xA9233751245AFB7420B6AE108dF94E63418aD4d9": "1633890.0",
+      "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4": "1643900.0"
+    }
+  }
+}
+```
+
+#### 2.5 Transfer Tokens
 
 ```bash
-curl http://localhost:3000/api/auth/users
+curl -X POST http://localhost:3000/api/token/transfer \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+    "toAddress": "0xRECIPIENT_ADDRESS",
+    "amount": "100",
+    "privateKey": "0xYOUR_PRIVATE_KEY"
+  }'
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "message": "Transfer successful",
+  "data": {
+    "txHash": "0x...",
+    "from": "0x...",
+    "to": "0x...",
+    "amount": "100",
+    "tokenAddress": "0x...",
+    "gasUsed": "51066"
+  }
+}
+```
+
+#### 2.6 Approve Spender
+
+```bash
+curl -X POST http://localhost:3000/api/token/approve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+    "spenderAddress": "0x92B4C76AB36D52deD3Da20aE91820D078Ab97C5c",
+    "amount": "1000",
+    "privateKey": "0xYOUR_PRIVATE_KEY"
+  }'
+```
+
+#### 2.7 Burn Tokens
+
+**Purpose:** Burn tokens from your own balance.
+
+```bash
+curl -X POST http://localhost:3000/api/token/burn \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+    "amount": "100",
+    "privateKey": "0xYOUR_PRIVATE_KEY"
+  }'
+```
+
+#### 2.8 Mint Tokens
+
+**Purpose:** Mint new tokens (TestToken has no access control).
+
+```bash
+curl -X POST http://localhost:3000/api/token/mint \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenAddress": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+    "toAddress": "0xRECIPIENT_ADDRESS",
+    "amount": "1000",
+    "privateKey": "0xYOUR_PRIVATE_KEY"
+  }'
 ```
 
 ---
 
 ### 3. Pool Operations
 
-#### 3.1 Initialize a Pool (Admin Only)
+#### 3.1 Initialize a Pool
 
 **Purpose:** Create a new liquidity pool for a token pair.
 
 ```bash
 curl -X POST http://localhost:3000/api/pool/initialize \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ADMIN_JWT_TOKEN" \
   -d '{
     "token0": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
     "token1": "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4",
@@ -271,7 +326,7 @@ curl "http://localhost:3000/api/pool/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/
     "tick": "0",
     "protocolFee": "0",
     "lpFee": "3000",
-    "liquidity": "1000000000000000000000"
+    "liquidity": "10000000000000000000000"
   }
 }
 ```
@@ -297,7 +352,7 @@ curl -X POST http://localhost:3000/api/pool/list \
 curl "http://localhost:3000/api/pool/token/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/balance"
 
 # Specific account balance
-curl "http://localhost:3000/api/pool/token/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/balance/0xYourAccountAddress"
+curl "http://localhost:3000/api/pool/token/0xA9233751245AFB7420B6AE108dF94E63418aD4d9/balance/0x725f3F18b27A94df1a4901bbfb7561Dc3B248481"
 ```
 
 ---
@@ -329,9 +384,10 @@ curl -X POST http://localhost:3000/api/swap/quote \
     "amountIn": "100",
     "estimatedAmountOut": "99.700000000000000000",
     "price": 1,
-    "priceImpact": "0.0100%",
+    "priceImpact": "1.0000%",
     "fee": "0.30%",
-    "poolLiquidity": "1000000.0"
+    "poolLiquidity": "10000.0",
+    "userBalances": null
   }
 }
 ```
@@ -343,13 +399,12 @@ curl -X POST http://localhost:3000/api/swap/quote \
 ```bash
 curl -X POST http://localhost:3000/api/swap \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "tokenIn": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
     "tokenOut": "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4",
     "amountIn": "100",
     "minAmountOut": "95",
-    "password": "securepassword123"
+    "privateKey": "0xYOUR_PRIVATE_KEY"
   }'
 ```
 
@@ -358,7 +413,7 @@ curl -X POST http://localhost:3000/api/swap \
 - `tokenOut`: Token to buy
 - `amountIn`: Amount to swap
 - `minAmountOut` (optional): Minimum acceptable output (slippage protection)
-- `password`: User's password to unlock wallet
+- `privateKey`: Your wallet private key
 
 **Expected Response:**
 ```json
@@ -367,11 +422,12 @@ curl -X POST http://localhost:3000/api/swap \
   "message": "Swap executed successfully",
   "data": {
     "txHash": "0x...",
+    "poolKey": {...},
     "amountIn": "100",
-    "amountOut": "99.5",
+    "amountOut": "98.715803439706129885",
     "minAmountOut": "95",
-    "zeroForOne": true,
-    "gasUsed": "150000",
+    "zeroForOne": false,
+    "gasUsed": "430880",
     "userAddress": "0x...",
     "balances": {
       "before": {...},
@@ -384,48 +440,100 @@ curl -X POST http://localhost:3000/api/swap \
 #### 4.3 Get User Balances
 
 ```bash
-curl "http://localhost:3000/api/swap/balances?tokens=0xA9233751245AFB7420B6AE108dF94E63418aD4d9,0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+curl -X POST http://localhost:3000/api/swap/balances \
+  -H "Content-Type: application/json" \
+  -d '{
+    "privateKey": "0xYOUR_PRIVATE_KEY",
+    "tokens": [
+      "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
+      "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4"
+    ]
+  }'
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "message": "Balances retrieved",
+  "data": {
+    "address": "0x725f3F18b27A94df1a4901bbfb7561Dc3B248481",
+    "native": "7.7546790447",
+    "tokens": {
+      "0xA9233751245AFB7420B6AE108dF94E63418aD4d9": "1623890.0",
+      "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4": "1633900.0"
+    }
+  }
+}
 ```
 
 ---
 
 ### 5. Liquidity Operations
 
-#### 5.1 Add Liquidity (Admin Only)
+#### 5.1 Add Liquidity
 
 **Purpose:** Provide liquidity to a pool.
 
 ```bash
 curl -X POST http://localhost:3000/api/liquidity/add \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ADMIN_JWT_TOKEN" \
   -d '{
     "token0": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
     "token1": "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4",
     "amount0": "1000",
     "amount1": "1000",
-    "password": "adminpassword123"
+    "privateKey": "0xYOUR_PRIVATE_KEY"
   }'
 ```
 
 **Parameters:**
 - `token0`, `token1`: Token pair addresses
 - `amount0`, `amount1`: Token amounts to deposit
-- `password`: Admin's password
+- `privateKey`: Your wallet private key
 - `tickLower`, `tickUpper` (optional): Custom price range
 
-#### 5.2 Remove Liquidity (Admin Only)
+**Expected Response:**
+```json
+{
+  "success": true,
+  "message": "Liquidity added successfully",
+  "data": {
+    "poolKey": {...},
+    "txHash": "0x...",
+    "liquidityDelta": "1000000000000000000000",
+    "amount0Deposited": "1000",
+    "amount1Deposited": "1000",
+    "fromWallet": "0x..."
+  }
+}
+```
+
+#### 5.2 Remove Liquidity
 
 ```bash
 curl -X POST http://localhost:3000/api/liquidity/remove \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ADMIN_JWT_TOKEN" \
   -d '{
     "token0": "0xA9233751245AFB7420B6AE108dF94E63418aD4d9",
     "token1": "0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4",
-    "liquidityAmount": "500"
+    "liquidityAmount": "500",
+    "privateKey": "0xYOUR_PRIVATE_KEY"
   }'
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "message": "Liquidity removed successfully",
+  "data": {
+    "poolKey": {...},
+    "txHash": "0x...",
+    "liquidityRemoved": "500",
+    "caller": "0x..."
+  }
+}
 ```
 
 #### 5.3 Get Pool Liquidity Info
@@ -442,10 +550,7 @@ curl "http://localhost:3000/api/liquidity/0xA9233751245AFB7420B6AE108dF94E63418a
 
 1. Download and install [Postman](https://www.postman.com/downloads/)
 2. Create a new Collection named "DEX API"
-3. Set up environment variables:
-   - `base_url`: `http://localhost:3000`
-   - `jwt_token`: (will be set after login)
-   - `admin_token`: (will be set after admin login)
+3. Set up environment variables
 
 ### Environment Variables
 
@@ -454,8 +559,7 @@ Create a Postman environment with:
 | Variable | Initial Value |
 |----------|---------------|
 | `base_url` | `http://localhost:3000` |
-| `jwt_token` | (empty) |
-| `admin_token` | (empty) |
+| `private_key` | `0xYOUR_PRIVATE_KEY` |
 | `tusd_address` | `0xA9233751245AFB7420B6AE108dF94E63418aD4d9` |
 | `tbrown_address` | `0x0e96A9D425bedEC3807CEb0aaA0825Aab5cF7Ea4` |
 | `tsmart_address` | `0x3F35Ff1a1C3AbfBc916dECde3DC08b2bFFFe8900` |
@@ -467,56 +571,34 @@ Create a Postman environment with:
 - **Method:** GET
 - **URL:** `{{base_url}}/health`
 
-#### 2. Register User
-- **Method:** POST
-- **URL:** `{{base_url}}/api/auth/register`
-- **Headers:** `Content-Type: application/json`
-- **Body (raw JSON):**
-```json
-{
-  "username": "alice",
-  "password": "securepassword123"
-}
-```
-- **Tests (to auto-save token):**
-```javascript
-if (pm.response.code === 201) {
-    var jsonData = pm.response.json();
-    pm.environment.set("jwt_token", jsonData.data.token);
-}
-```
+#### 2. Get Token Info
+- **Method:** GET
+- **URL:** `{{base_url}}/api/token/{{tusd_address}}/info`
 
-#### 3. Login
+#### 3. Get Token Balance
+- **Method:** GET
+- **URL:** `{{base_url}}/api/token/{{tusd_address}}/balance/0x725f3F18b27A94df1a4901bbfb7561Dc3B248481`
+
+#### 4. Get Multiple Balances
 - **Method:** POST
-- **URL:** `{{base_url}}/api/auth/login`
+- **URL:** `{{base_url}}/api/token/balances`
 - **Headers:** `Content-Type: application/json`
 - **Body:**
 ```json
 {
-  "username": "alice",
-  "password": "securepassword123"
-}
-```
-- **Tests:**
-```javascript
-if (pm.response.code === 200) {
-    var jsonData = pm.response.json();
-    pm.environment.set("jwt_token", jsonData.data.token);
+  "privateKey": "{{private_key}}",
+  "tokens": ["{{tusd_address}}", "{{tbrown_address}}"]
 }
 ```
 
-#### 4. Get Current User
+#### 5. Get Pool Info
 - **Method:** GET
-- **URL:** `{{base_url}}/api/auth/me`
-- **Headers:** 
-  - `Authorization: Bearer {{jwt_token}}`
+- **URL:** `{{base_url}}/api/pool/{{tusd_address}}/{{tbrown_address}}`
 
-#### 5. Initialize Pool
+#### 6. Initialize Pool
 - **Method:** POST
 - **URL:** `{{base_url}}/api/pool/initialize`
-- **Headers:**
-  - `Content-Type: application/json`
-  - `Authorization: Bearer {{admin_token}}`
+- **Headers:** `Content-Type: application/json`
 - **Body:**
 ```json
 {
@@ -525,10 +607,6 @@ if (pm.response.code === 200) {
   "priceRatio": 1
 }
 ```
-
-#### 6. Get Pool Info
-- **Method:** GET
-- **URL:** `{{base_url}}/api/pool/{{tusd_address}}/{{tbrown_address}}`
 
 #### 7. Get Swap Quote
 - **Method:** POST
@@ -546,9 +624,7 @@ if (pm.response.code === 200) {
 #### 8. Execute Swap
 - **Method:** POST
 - **URL:** `{{base_url}}/api/swap`
-- **Headers:**
-  - `Content-Type: application/json`
-  - `Authorization: Bearer {{jwt_token}}`
+- **Headers:** `Content-Type: application/json`
 - **Body:**
 ```json
 {
@@ -556,16 +632,14 @@ if (pm.response.code === 200) {
   "tokenOut": "{{tbrown_address}}",
   "amountIn": "100",
   "minAmountOut": "95",
-  "password": "securepassword123"
+  "privateKey": "{{private_key}}"
 }
 ```
 
 #### 9. Add Liquidity
 - **Method:** POST
 - **URL:** `{{base_url}}/api/liquidity/add`
-- **Headers:**
-  - `Content-Type: application/json`
-  - `Authorization: Bearer {{admin_token}}`
+- **Headers:** `Content-Type: application/json`
 - **Body:**
 ```json
 {
@@ -573,17 +647,27 @@ if (pm.response.code === 200) {
   "token1": "{{tbrown_address}}",
   "amount0": "1000",
   "amount1": "1000",
-  "password": "adminpassword123"
+  "privateKey": "{{private_key}}"
+}
+```
+
+#### 10. Transfer Tokens
+- **Method:** POST
+- **URL:** `{{base_url}}/api/token/transfer`
+- **Headers:** `Content-Type: application/json`
+- **Body:**
+```json
+{
+  "tokenAddress": "{{tusd_address}}",
+  "toAddress": "0xRECIPIENT",
+  "amount": "100",
+  "privateKey": "{{private_key}}"
 }
 ```
 
 ### Import Collection
 
 You can import this collection directly into Postman:
-
-1. Click "Import" in Postman
-2. Choose "Raw text"
-3. Paste the following JSON:
 
 ```json
 {
@@ -600,35 +684,29 @@ You can import this collection directly into Postman:
       }
     },
     {
-      "name": "Register",
-      "request": {
-        "method": "POST",
-        "url": "{{base_url}}/api/auth/register",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {
-          "mode": "raw",
-          "raw": "{\"username\": \"alice\", \"password\": \"securepassword123\"}"
-        }
-      }
-    },
-    {
-      "name": "Login",
-      "request": {
-        "method": "POST",
-        "url": "{{base_url}}/api/auth/login",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {
-          "mode": "raw",
-          "raw": "{\"username\": \"alice\", \"password\": \"securepassword123\"}"
-        }
-      }
-    },
-    {
-      "name": "Get Me",
+      "name": "Token Info",
       "request": {
         "method": "GET",
-        "url": "{{base_url}}/api/auth/me",
-        "header": [{"key": "Authorization", "value": "Bearer {{jwt_token}}"}]
+        "url": "{{base_url}}/api/token/{{tusd_address}}/info"
+      }
+    },
+    {
+      "name": "Token Balances",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/api/token/balances",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"privateKey\": \"{{private_key}}\", \"tokens\": [\"{{tusd_address}}\", \"{{tbrown_address}}\"]}"
+        }
+      }
+    },
+    {
+      "name": "Pool Info",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/api/pool/{{tusd_address}}/{{tbrown_address}}"
       }
     },
     {
@@ -640,6 +718,30 @@ You can import this collection directly into Postman:
         "body": {
           "mode": "raw",
           "raw": "{\"tokenIn\": \"{{tusd_address}}\", \"tokenOut\": \"{{tbrown_address}}\", \"amountIn\": \"100\"}"
+        }
+      }
+    },
+    {
+      "name": "Execute Swap",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/api/swap",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"tokenIn\": \"{{tusd_address}}\", \"tokenOut\": \"{{tbrown_address}}\", \"amountIn\": \"100\", \"minAmountOut\": \"95\", \"privateKey\": \"{{private_key}}\"}"
+        }
+      }
+    },
+    {
+      "name": "Add Liquidity",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/api/liquidity/add",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"token0\": \"{{tusd_address}}\", \"token1\": \"{{tbrown_address}}\", \"amount0\": \"1000\", \"amount1\": \"1000\", \"privateKey\": \"{{private_key}}\"}"
         }
       }
     }
@@ -665,20 +767,32 @@ You can import this collection directly into Postman:
 | Error | Cause | Solution |
 |-------|-------|----------|
 | `Missing required fields` | Request body incomplete | Check all required fields are provided |
-| `Invalid token` | JWT expired or invalid | Login again to get fresh token |
-| `Insufficient balance` | Not enough tokens | Fund your wallet with tokens |
-| `Pool has no liquidity` | Empty pool | Admin needs to add liquidity first |
+| `Private key is required` | No private key in request | Include `privateKey` in request body |
+| `Insufficient balance` | Not enough tokens | Check balance and fund wallet if needed |
+| `Pool has no liquidity` | Empty pool | Add liquidity to pool first |
 | `Pool has already been initialized` | Pool exists | Use existing pool or different token pair |
-| `Admin access required` | Non-admin attempting admin action | Use admin account |
+| `execution reverted` | Contract call failed | Check function exists on deployed contract |
 
 ---
 
 ## Typical Workflow
 
 1. **Start API server:** `node api/index.js`
-2. **Register admin user** (first user with `adminSecret`)
-3. **Initialize pools** for token pairs (admin)
-4. **Add liquidity** to pools (admin)
-5. **Register regular users**
-6. **Fund user wallets** with tokens
-7. **Users can swap** tokens through the API
+2. **Check token info:** `GET /api/token/:addr/info`
+3. **Check balances:** `POST /api/token/balances` with your private key
+4. **Initialize pool** (if needed): `POST /api/pool/initialize`
+5. **Add liquidity:** `POST /api/liquidity/add` with your private key
+6. **Get swap quote:** `POST /api/swap/quote`
+7. **Execute swap:** `POST /api/swap` with your private key
+
+---
+
+## Security Notes
+
+⚠️ **Important:** This API uses raw private keys for simplicity. In production:
+
+1. **Never expose private keys** in logs or error messages
+2. **Use HTTPS** in production environments
+3. **Consider** implementing proper authentication (JWT, API keys)
+4. **Store** private keys securely (hardware wallets, HSM, secure vaults)
+5. **Limit** API access to trusted networks/IPs

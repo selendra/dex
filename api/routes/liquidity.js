@@ -1,41 +1,34 @@
 const express = require('express');
 const router = express.Router();
 const blockchainService = require('../services/blockchain');
-const { authenticate, requireAdmin } = require('../middleware/auth');
-
-const authService = require('../services/auth');
 
 /**
  * POST /api/liquidity/add
- * Add liquidity to a pool using user's wallet
+ * Add liquidity to a pool
  * Body: {
  *   token0: "0x...",
  *   token1: "0x...",
  *   amount0: "1000",
  *   amount1: "1000",
- *   password: "user's password" (required to decrypt wallet),
+ *   privateKey: "0x...",
  *   tickLower: -887220 (optional),
  *   tickUpper: 887220 (optional)
  * }
  */
-router.post('/add', authenticate, requireAdmin, async (req, res, next) => {
+router.post('/add', async (req, res, next) => {
   try {
-    const { token0, token1, amount0, amount1, password, tickLower, tickUpper } = req.body;
+    const { token0, token1, amount0, amount1, privateKey, tickLower, tickUpper } = req.body;
     
     // Validate input
-    if (!token0 || !token1 || !amount0 || !amount1 || !password) {
+    if (!token0 || !token1 || !amount0 || !amount1 || !privateKey) {
       return res.status(400).json({
         error: 'Missing required fields',
-        required: ['token0', 'token1', 'amount0', 'amount1', 'password']
+        required: ['token0', 'token1', 'amount0', 'amount1', 'privateKey']
       });
     }
     
-    // Get user's wallet using their password
-    const userWallet = authService.getUserWallet(
-      req.user.username, 
-      password,
-      blockchainService.provider
-    );
+    // Create wallet from private key
+    const userWallet = blockchainService.createWalletFromPrivateKey(privateKey);
     
     // Add liquidity using user's wallet
     const result = await blockchainService.addLiquidityWithWallet(
@@ -65,21 +58,25 @@ router.post('/add', authenticate, requireAdmin, async (req, res, next) => {
  *   token0: "0x...",
  *   token1: "0x...",
  *   liquidityAmount: "500",
+ *   privateKey: "0x...",
  *   tickLower: -887220 (optional),
  *   tickUpper: 887220 (optional)
  * }
  */
-router.post('/remove', authenticate, requireAdmin, async (req, res, next) => {
+router.post('/remove', async (req, res, next) => {
   try {
-    const { token0, token1, liquidityAmount, tickLower, tickUpper } = req.body;
+    const { token0, token1, liquidityAmount, privateKey, tickLower, tickUpper } = req.body;
     
     // Validate input
-    if (!token0 || !token1 || !liquidityAmount) {
+    if (!token0 || !token1 || !liquidityAmount || !privateKey) {
       return res.status(400).json({
         error: 'Missing required fields',
-        required: ['token0', 'token1', 'liquidityAmount']
+        required: ['token0', 'token1', 'liquidityAmount', 'privateKey']
       });
     }
+    
+    // Create wallet from private key (for future use if needed)
+    const userWallet = blockchainService.createWalletFromPrivateKey(privateKey);
     
     // Remove liquidity
     const result = await blockchainService.removeLiquidity(
@@ -93,7 +90,10 @@ router.post('/remove', authenticate, requireAdmin, async (req, res, next) => {
     res.json({
       success: true,
       message: 'Liquidity removed successfully',
-      data: result
+      data: {
+        ...result,
+        caller: userWallet.address
+      }
     });
   } catch (error) {
     next(error);

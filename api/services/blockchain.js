@@ -109,6 +109,30 @@ class BlockchainService {
     throw new Error('Contract deployment should be done via Hardhat scripts (npm run deploy:local). This method requires Hardhat environment.');
   }
 
+  /**
+   * Create a wallet from private key
+   * @param {string} privateKey - The private key (with or without 0x prefix)
+   * @returns {ethers.Wallet} Connected wallet
+   */
+  createWalletFromPrivateKey(privateKey) {
+    if (!privateKey) {
+      throw new Error('Private key is required');
+    }
+    // Ensure private key has 0x prefix
+    const pk = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+    return new ethers.Wallet(pk, this.provider);
+  }
+
+  /**
+   * Get address from private key without creating full wallet
+   * @param {string} privateKey - The private key
+   * @returns {string} The wallet address
+   */
+  getAddressFromPrivateKey(privateKey) {
+    const wallet = this.createWalletFromPrivateKey(privateKey);
+    return wallet.address;
+  }
+
   async loadToken(tokenAddress) {
     if (!this.tokens[tokenAddress]) {
       const tokenABI = [

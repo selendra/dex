@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const blockchainService = require('../services/blockchain');
-const { authenticate, requireAdmin } = require('../middleware/auth');
 
 /**
  * POST /api/pool/initialize
@@ -9,12 +8,13 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
  * Body: {
  *   token0: "0x...",
  *   token1: "0x...",
- *   priceRatio: 1 (optional, e.g., 1 for 1:1, 10 for 10:1, 0.5 for 1:2)
+ *   priceRatio: 1 (optional, e.g., 1 for 1:1, 10 for 10:1, 0.5 for 1:2),
+ *   privateKey: "0x..." (optional - for logging purposes)
  * }
  */
-router.post('/initialize', authenticate, requireAdmin, async (req, res, next) => {
+router.post('/initialize', async (req, res, next) => {
   try {
-    const { token0, token1, priceRatio } = req.body;
+    const { token0, token1, priceRatio, privateKey } = req.body;
     
     // Validate input
     if (!token0 || !token1) {
@@ -39,10 +39,23 @@ router.post('/initialize', authenticate, requireAdmin, async (req, res, next) =>
       priceRatio
     );
     
+    // Add caller info if private key provided
+    let caller = null;
+    if (privateKey) {
+      try {
+        caller = blockchainService.getAddressFromPrivateKey(privateKey);
+      } catch (e) {
+        // Ignore invalid private key
+      }
+    }
+    
     res.json({
       success: true,
       message: 'Pool initialized successfully',
-      data: result
+      data: {
+        ...result,
+        caller
+      }
     });
   } catch (error) {
     next(error);

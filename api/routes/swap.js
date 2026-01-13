@@ -1,35 +1,32 @@
 const express = require('express');
 const router = express.Router();
 const blockchainService = require('../services/blockchain');
-const authService = require('../services/auth');
-const { authenticate, optionalAuth } = require('../middleware/auth');
 
 /**
  * POST /api/swap
- * Execute a token swap (requires authentication)
- * Header: Authorization: Bearer <token>
+ * Execute a token swap
  * Body: {
  *   tokenIn: "0x...",
  *   tokenOut: "0x...",
  *   amountIn: "100",
  *   minAmountOut: "95" (optional),
- *   password: "userpassword" (required to unlock wallet)
+ *   privateKey: "0x..." (required)
  * }
  */
-router.post('/', authenticate, async (req, res, next) => {
+router.post('/', async (req, res, next) => {
   try {
-    const { tokenIn, tokenOut, amountIn, minAmountOut, password } = req.body;
+    const { tokenIn, tokenOut, amountIn, minAmountOut, privateKey } = req.body;
     
     // Validate input
-    if (!tokenIn || !tokenOut || !amountIn || !password) {
+    if (!tokenIn || !tokenOut || !amountIn || !privateKey) {
       return res.status(400).json({
         error: 'Missing required fields',
-        required: ['tokenIn', 'tokenOut', 'amountIn', 'password']
+        required: ['tokenIn', 'tokenOut', 'amountIn', 'privateKey']
       });
     }
     
-    // Get user's wallet
-    const userWallet = authService.getUserWallet(req.user.username, password);
+    // Create wallet from private key
+    const userWallet = blockchainService.createWalletFromPrivateKey(privateKey);
     
     // Get balances before swap
     const balancesBefore = await blockchainService.getUserBalances(
@@ -86,12 +83,13 @@ router.post('/', authenticate, async (req, res, next) => {
  * Body: {
  *   tokenIn: "0x...",
  *   tokenOut: "0x...",
- *   amountIn: "100"
+ *   amountIn: "100",
+ *   privateKey: "0x..." (optional - if provided, includes user balances)
  * }
  */
-router.post('/quote', optionalAuth, async (req, res, next) => {
+router.post('/quote', async (req, res, next) => {
   try {
-    const { tokenIn, tokenOut, amountIn } = req.body;
+    const { tokenIn, tokenOut, amountIn, privateKey } = req.body;
     
     if (!tokenIn || !tokenOut || !amountIn) {
       return res.status(400).json({
@@ -103,13 +101,18 @@ router.post('/quote', optionalAuth, async (req, res, next) => {
     // Get swap quote with calculated output
     const quote = await blockchainService.getSwapQuote(tokenIn, tokenOut, parseFloat(amountIn));
     
-    // If user is authenticated, include their balances
+    // If private key provided, include their balances
     let userBalances = null;
-    if (req.user && req.user.address) {
-      userBalances = await blockchainService.getUserBalances(
-        req.user.address,
-        [tokenIn, tokenOut]
-      );
+    if (privateKey) {
+      try {
+        const wallet = blockchainService.createWalletFromPrivateKey(privateKey);
+        userBalances = await blockchainService.getUserBalances(
+          wallet.address,
+          [tokenIn, tokenOut]
+        );
+      } catch (e) {
+        // Ignore invalid private key for quote
+      }
     }
     
     res.json({
@@ -126,25 +129,39 @@ router.post('/quote', optionalAuth, async (req, res, next) => {
 });
 
 /**
- * GET /api/swap/balances
+ * POST /api/swap/balances
  * Get user's token and native balances
- * Header: Authorization: Bearer <token>
- * Query params: ?tokens=0x...,0x...
+ * Body: {
+ *   privateKey: "0x...",
+ *   tokens: ["0x...", "0x..."]
+ * }
  */
-router.get('/balances', authenticate, async (req, res, next) => {
+router.post('/balances', async (req, res, next) => {
   try {
-    const { tokens } = req.query;
-    const tokenAddresses = tokens ? tokens.split(',') : [];
+    const { privateKey, tokens } = req.body;
+    
+    if (!privateKey) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['privateKey']
+      });
+    }
+    
+    const wallet = blockchainService.createWalletFromPrivateKey(privateKey);
+    const tokenAddresses = tokens || [];
     
     const balances = await blockchainService.getUserBalances(
-      req.user.address,
+      wallet.address,
       tokenAddresses
     );
     
     res.json({
       success: true,
       message: 'Balances retrieved',
-      data: balances
+      data: {
+        address: wallet.address,
+        ...balances
+      }
     });
   } catch (error) {
     next(error);
