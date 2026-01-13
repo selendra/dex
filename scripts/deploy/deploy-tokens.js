@@ -9,14 +9,14 @@ async function main() {
   console.log("\nDeploying with account:", deployer.address);
   console.log("Balance:", hre.ethers.formatEther(await hre.ethers.provider.getBalance(deployer.address)), "SEL");
 
-  const TestToken = await hre.ethers.getContractFactory("TestToken");
+  const SELToken = await hre.ethers.getContractFactory("SELToken");
 
   // Deploy TokenS (Stable Coin)
   console.log("\n" + "-".repeat(70));
   console.log("1. Deploying TokenS (Stable Coin)...");
   console.log("-".repeat(70));
 
-  const tokenS = await TestToken.deploy("Token Stable", "TOKENS");
+  const tokenS = await SELToken.deploy("Token Stable", "TOKENS");
   await tokenS.waitForDeployment();
   const tokenSAddress = await tokenS.getAddress();
 
@@ -29,7 +29,7 @@ async function main() {
   console.log("2. Deploying TokenA (10 TokenA = 1 TokenS)...");
   console.log("-".repeat(70));
 
-  const tokenA = await TestToken.deploy("Token A", "TOKENA");
+  const tokenA = await SELToken.deploy("Token A", "TOKENA");
   await tokenA.waitForDeployment();
   const tokenAAddress = await tokenA.getAddress();
 
@@ -43,7 +43,7 @@ async function main() {
   console.log("3. Deploying TokenB (20 TokenB = 1 TokenS)...");
   console.log("-".repeat(70));
 
-  const tokenB = await TestToken.deploy("Token B", "TOKENB");
+  const tokenB = await SELToken.deploy("Token B", "TOKENB");
   await tokenB.waitForDeployment();
   const tokenBAddress = await tokenB.getAddress();
 
@@ -57,7 +57,7 @@ async function main() {
   console.log("4. Deploying TokenC (1 TokenC = 1 TokenS)...");
   console.log("-".repeat(70));
 
-  const tokenC = await TestToken.deploy("Token C", "TOKENC");
+  const tokenC = await SELToken.deploy("Token C", "TOKENC");
   await tokenC.waitForDeployment();
   const tokenCAddress = await tokenC.getAddress();
 

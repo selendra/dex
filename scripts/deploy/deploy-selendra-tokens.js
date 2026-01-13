@@ -36,8 +36,8 @@ async function main() {
     console.log("----------------------------------------------------------------------");
 
     try {
-      const TestToken = await hre.ethers.getContractFactory("TestToken");
-      const tokenContract = await TestToken.deploy(token.name, token.symbol);
+      const SELToken = await hre.ethers.getContractFactory("SELToken");
+      const tokenContract = await SELToken.deploy(token.name, token.symbol);
       await tokenContract.waitForDeployment();
       
       const address = await tokenContract.getAddress();

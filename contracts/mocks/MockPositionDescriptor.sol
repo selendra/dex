@@ -16,9 +16,9 @@ contract MockPositionDescriptor is IPositionDescriptor {
         wrappedNative = _wrappedNative;
     }
 
-    function tokenURI(IPositionManager positionManager, uint256 tokenId)
+    function tokenURI(IPositionManager /* positionManager */, uint256 /* tokenId */)
         external
-        view
+        pure
         override
         returns (string memory)
     {
@@ -30,12 +30,12 @@ contract MockPositionDescriptor is IPositionDescriptor {
         );
     }
 
-    function flipRatio(address currency0, address currency1) external pure override returns (bool) {
+    function flipRatio(address /* currency0 */, address /* currency1 */) external pure override returns (bool) {
         // For testing, never flip
         return false;
     }
 
-    function currencyRatioPriority(address currency) external pure override returns (int256) {
+    function currencyRatioPriority(address /* currency */) external pure override returns (int256) {
         // All currencies have equal priority for testing
         return 0;
     }

@@ -3,13 +3,13 @@ pragma solidity 0.8.26;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-/// @title TestToken - Simple ERC20 for testing
-contract TestToken is ERC20 {
+/// @title SELToken - Mintable/Burnable ERC20 Token for Selendra DEX
+contract SELToken is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {
         _mint(msg.sender, 1_000_000 * 10**18); // 1 million tokens
     }
 
-    /// @notice Mint new tokens (for testing purposes)
+    /// @notice Mint new tokens
     /// @param to Address to receive tokens
     /// @param amount Amount to mint
     function mint(address to, uint256 amount) external {

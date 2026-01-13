@@ -35,7 +35,7 @@ library CurrencySettler {
         IPoolManager manager,
         address recipient,
         uint256 amount,
-        bool claims
+        bool /* claims */
     ) internal {
         // Take from PoolManager's reserves
         manager.take(currency, recipient, amount);

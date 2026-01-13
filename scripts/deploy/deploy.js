@@ -25,21 +25,21 @@ async function main() {
   const stateViewAddress = await stateView.getAddress();
   console.log("  ✓ StateView deployed:", stateViewAddress);
 
-  // Deploy SimpleLiquidityManager
-  console.log("\n➤ Deploying SimpleLiquidityManager...");
-  const SimpleLiquidityManager = await hre.ethers.getContractFactory("SimpleLiquidityManager");
-  const liquidityManager = await SimpleLiquidityManager.deploy(poolManagerAddress);
+  // Deploy LiquidityManager
+  console.log("\n➤ Deploying LiquidityManager...");
+  const LiquidityManager = await hre.ethers.getContractFactory("LiquidityManager");
+  const liquidityManager = await LiquidityManager.deploy(poolManagerAddress);
   await liquidityManager.waitForDeployment();
   const liquidityManagerAddress = await liquidityManager.getAddress();
-  console.log("  ✓ SimpleLiquidityManager deployed:", liquidityManagerAddress);
+  console.log("  ✓ LiquidityManager deployed:", liquidityManagerAddress);
 
-  // Deploy WorkingSwapRouter
-  console.log("\n➤ Deploying WorkingSwapRouter...");
-  const WorkingSwapRouter = await hre.ethers.getContractFactory("WorkingSwapRouter");
-  const swapRouter = await WorkingSwapRouter.deploy(poolManagerAddress);
+  // Deploy SwapRouter
+  console.log("\n➤ Deploying SwapRouter...");
+  const SwapRouter = await hre.ethers.getContractFactory("SwapRouter");
+  const swapRouter = await SwapRouter.deploy(poolManagerAddress);
   await swapRouter.waitForDeployment();
   const swapRouterAddress = await swapRouter.getAddress();
-  console.log("  ✓ WorkingSwapRouter deployed:", swapRouterAddress);
+  console.log("  ✓ SwapRouter deployed:", swapRouterAddress);
 
   // Summary
   console.log("\n" + "=".repeat(60));

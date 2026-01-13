@@ -48,31 +48,31 @@ async function main() {
     process.exit(1);
   }
 
-  // 3. Deploy SimpleLiquidityManager
-  console.log("\n➤ Deploying SimpleLiquidityManager...");
+  // 3. Deploy LiquidityManager
+  console.log("\n➤ Deploying LiquidityManager...");
   try {
-    const SimpleLiquidityManager = await hre.ethers.getContractFactory("SimpleLiquidityManager");
-    const liquidityManager = await SimpleLiquidityManager.deploy(deployedContracts.PoolManager);
+    const LiquidityManager = await hre.ethers.getContractFactory("LiquidityManager");
+    const liquidityManager = await LiquidityManager.deploy(deployedContracts.PoolManager);
     await liquidityManager.waitForDeployment();
     const liquidityManagerAddress = await liquidityManager.getAddress();
-    console.log(`  ✓ SimpleLiquidityManager deployed: ${liquidityManagerAddress}`);
+    console.log(`  ✓ LiquidityManager deployed: ${liquidityManagerAddress}`);
     deployedContracts.LiquidityManager = liquidityManagerAddress;
   } catch (error) {
-    console.error("  ✗ SimpleLiquidityManager failed:", error.message);
+    console.error("  ✗ LiquidityManager failed:", error.message);
     process.exit(1);
   }
 
-  // 4. Deploy WorkingSwapRouter
-  console.log("\n➤ Deploying WorkingSwapRouter...");
+  // 4. Deploy SwapRouter
+  console.log("\n➤ Deploying SwapRouter...");
   try {
-    const WorkingSwapRouter = await hre.ethers.getContractFactory("WorkingSwapRouter");
-    const swapRouter = await WorkingSwapRouter.deploy(deployedContracts.PoolManager);
+    const SwapRouter = await hre.ethers.getContractFactory("SwapRouter");
+    const swapRouter = await SwapRouter.deploy(deployedContracts.PoolManager);
     await swapRouter.waitForDeployment();
     const swapRouterAddress = await swapRouter.getAddress();
-    console.log(`  ✓ WorkingSwapRouter deployed: ${swapRouterAddress}`);
+    console.log(`  ✓ SwapRouter deployed: ${swapRouterAddress}`);
     deployedContracts.SwapRouter = swapRouterAddress;
   } catch (error) {
-    console.error("  ✗ WorkingSwapRouter failed:", error.message);
+    console.error("  ✗ SwapRouter failed:", error.message);
     process.exit(1);
   }
 

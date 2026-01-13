@@ -9,8 +9,9 @@ import {IUnlockCallback} from "./core/interfaces/callback/IUnlockCallback.sol";
 import {SwapParams} from "./core/types/PoolOperation.sol";
 import {CurrencySettler} from "./CurrencySettler.sol";
 
-/// @title WorkingSwapRouter - Simplified without struct wrapper
-contract WorkingSwapRouter is IUnlockCallback {
+/// @title SwapRouter - Uniswap V4 Token Swap Router
+/// @notice Handles token swaps through PoolManager
+contract SwapRouter is IUnlockCallback {
     using CurrencySettler for Currency;
 
     IPoolManager public immutable poolManager;

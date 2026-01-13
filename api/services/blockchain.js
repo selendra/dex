@@ -67,11 +67,11 @@ class BlockchainService {
       ).abi;
       
       const liquidityManagerABI = JSON.parse(
-        fs.readFileSync(path.join(artifactsPath, 'SimpleLiquidityManager.sol/SimpleLiquidityManager.json'), 'utf8')
+        fs.readFileSync(path.join(artifactsPath, 'LiquidityManager.sol/LiquidityManager.json'), 'utf8')
       ).abi;
       
       const swapRouterABI = JSON.parse(
-        fs.readFileSync(path.join(artifactsPath, 'WorkingSwapRouter.sol/WorkingSwapRouter.json'), 'utf8')
+        fs.readFileSync(path.join(artifactsPath, 'SwapRouter.sol/SwapRouter.json'), 'utf8')
       ).abi;
       
       // Connect to contracts with signer

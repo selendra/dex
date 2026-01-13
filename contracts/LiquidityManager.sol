@@ -8,8 +8,9 @@ import {BalanceDelta} from "./core/types/BalanceDelta.sol";
 import {ModifyLiquidityParams} from "./core/types/PoolOperation.sol";
 import {IERC20Minimal} from "./core/interfaces/external/IERC20Minimal.sol";
 
-/// @title SimpleLiquidityManager - Uses CurrencySettler pattern from v4-core tests
-contract SimpleLiquidityManager {
+/// @title LiquidityManager - Uniswap V4 Liquidity Management
+/// @notice Manages liquidity positions using CurrencySettler pattern
+contract LiquidityManager {
     IPoolManager public immutable poolManager;
     
     constructor(IPoolManager _poolManager) {
