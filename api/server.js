@@ -5,6 +5,7 @@ const swapRoutes = require('./routes/swap');
 const liquidityRoutes = require('./routes/liquidity');
 const poolRoutes = require('./routes/pool');
 const tokenRoutes = require('./routes/token');
+const oracleRoutes = require('./routes/oracle');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,6 +20,7 @@ app.use('/api/swap', swapRoutes);
 app.use('/api/liquidity', liquidityRoutes);
 app.use('/api/pool', poolRoutes);
 app.use('/api/token', tokenRoutes);
+app.use('/api/oracle', oracleRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -42,6 +44,7 @@ app.listen(PORT, () => {
   console.log(`💧 Liquidity endpoint: http://localhost:${PORT}/api/liquidity`);
   console.log(`🏊 Pool endpoint: http://localhost:${PORT}/api/pool`);
   console.log(`🪙 Token endpoint: http://localhost:${PORT}/api/token`);
+  console.log(`📈 Oracle endpoint: http://localhost:${PORT}/api/oracle`);
 });
 
 module.exports = app;

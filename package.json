@@ -8,6 +8,7 @@
     "compile": "hardhat compile",
     "deploy:local": "hardhat run scripts/deploy/deploy.js --network localhost",
     "deploy:tokens": "hardhat run scripts/deploy/deploy-tokens.js --network localhost",
+    "deploy:oracle": "hardhat run scripts/deploy/deploy-oracle.js --network selendra",
     "transfer:admin": "hardhat run scripts/transfer-to-admin.js --network localhost",
     "node": "hardhat node",
     "clean": "hardhat clean",

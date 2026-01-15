@@ -9,6 +9,7 @@ class BlockchainService {
     this.stateView = null;
     this.liquidityManager = null;
     this.swapRouter = null;
+    this.priceOracle = null;
     this.tokens = {};
     this.signer = null;
     
@@ -33,6 +34,7 @@ class BlockchainService {
       const stateViewAddr = process.env.SELENDRA_STATE_VIEW_ADDRESS;
       const liquidityManagerAddr = process.env.SELENDRA_LIQUIDITY_MANAGER_ADDRESS;
       const swapRouterAddr = process.env.SELENDRA_SWAP_ROUTER_ADDRESS;
+      const priceOracleAddr = process.env.SELENDRA_PRICE_ORACLE_ADDRESS;
       console.log('🌐 Connecting to SELENDRA network...');
       
       // Connect to network
@@ -79,6 +81,15 @@ class BlockchainService {
       this.stateView = new ethers.Contract(stateViewAddr, stateViewABI, this.signer);
       this.liquidityManager = new ethers.Contract(liquidityManagerAddr, liquidityManagerABI, this.signer);
       this.swapRouter = new ethers.Contract(swapRouterAddr, swapRouterABI, this.signer);
+      
+      // Load PriceOracle if available
+      if (priceOracleAddr) {
+        const priceOracleABI = JSON.parse(
+          fs.readFileSync(path.join(artifactsPath, 'PriceOracle.sol/PriceOracle.json'), 'utf8')
+        ).abi;
+        this.priceOracle = new ethers.Contract(priceOracleAddr, priceOracleABI, this.signer);
+        console.log('   PriceOracle:', await this.priceOracle.getAddress());
+      }
       
       console.log('✅ Blockchain service initialized (SELENDRA)');
       console.log('   PoolManager:', await this.poolManager.getAddress());
@@ -1003,6 +1014,338 @@ class BlockchainService {
       txHash: tx.hash,
       oldAdmin,
       newAdmin,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  // ============================================================
+  // PRICE ORACLE FUNCTIONS
+  // ============================================================
+
+  /**
+   * Get price for a token pair (from pool or external feed)
+   */
+  async getPrice(token0, token1) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const priceInfo = await this.priceOracle.getPrice(token0, token1);
+    
+    return {
+      price: ethers.formatUnits(priceInfo.price, 18),
+      twap: ethers.formatUnits(priceInfo.twap, 18),
+      lastUpdate: priceInfo.lastUpdate.toString(),
+      fromPool: priceInfo.fromPool,
+      isStale: priceInfo.isStale
+    };
+  }
+
+  /**
+   * Get price from on-chain pool only
+   */
+  async getPoolPrice(token0, token1) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const [price, sqrtPriceX96] = await this.priceOracle.getPoolPrice(token0, token1);
+    
+    return {
+      price: ethers.formatUnits(price, 18),
+      sqrtPriceX96: sqrtPriceX96.toString()
+    };
+  }
+
+  /**
+   * Get external price feed only
+   */
+  async getExternalPrice(token0, token1) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const priceData = await this.priceOracle.getExternalPrice(token0, token1);
+    
+    return {
+      price: ethers.formatUnits(priceData.price, 18),
+      timestamp: priceData.timestamp.toString(),
+      isValid: priceData.isValid
+    };
+  }
+
+  /**
+   * Get TWAP for a token pair
+   */
+  async getTWAP(token0, token1) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const twap = await this.priceOracle.getTWAP(token0, token1);
+    
+    return {
+      twap: ethers.formatUnits(twap, 18)
+    };
+  }
+
+  /**
+   * Feed price for a token pair (admin/authorized feeder only)
+   */
+  async feedPrice(feederPrivateKey, token0, token1, price) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const feederWallet = this.createWalletFromPrivateKey(feederPrivateKey);
+    const oracleWithFeeder = this.priceOracle.connect(feederWallet);
+    
+    // Price should already be in 18 decimal format (wei)
+    // If it's a string number, use it directly; if it's a decimal, convert
+    let priceWei;
+    if (price.toString().includes('.')) {
+      // Human-readable format like "3.5" - convert to 18 decimals
+      priceWei = ethers.parseUnits(price.toString(), 18);
+    } else {
+      // Already in wei format (18 decimals)
+      priceWei = BigInt(price);
+    }
+    
+    const tx = await oracleWithFeeder.feedPrice(token0, token1, priceWei);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      token0,
+      token1,
+      price: priceWei.toString(),
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Feed multiple prices at once (admin/authorized feeder only)
+   */
+  async feedPricesBatch(feederPrivateKey, pairs) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const feederWallet = this.createWalletFromPrivateKey(feederPrivateKey);
+    const oracleWithFeeder = this.priceOracle.connect(feederWallet);
+    
+    const token0s = pairs.map(p => p.token0);
+    const token1s = pairs.map(p => p.token1);
+    const prices = pairs.map(p => {
+      const price = p.price.toString();
+      if (price.includes('.')) {
+        return ethers.parseUnits(price, 18);
+      }
+      return BigInt(price);
+    });
+    
+    const tx = await oracleWithFeeder.feedPricesBatch(token0s, token1s, prices);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      pairsUpdated: pairs.length,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Observe current pool price (updates TWAP)
+   */
+  async observePoolPrice(token0, token1, privateKey) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const wallet = this.createWalletFromPrivateKey(privateKey);
+    const oracleWithWallet = this.priceOracle.connect(wallet);
+    
+    const tx = await oracleWithWallet.observePoolPrice(token0, token1);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      token0,
+      token1,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Get observation count for a pair
+   */
+  async getObservationCount(token0, token1) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const count = await this.priceOracle.getObservationCount(token0, token1);
+    
+    return {
+      count: count.toString()
+    };
+  }
+
+  /**
+   * Check if an address is an authorized price feeder
+   */
+  async isAuthorizedFeeder(account) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const isAuthorized = await this.priceOracle.authorizedFeeders(account);
+    
+    return isAuthorized;
+  }
+
+  /**
+   * Set authorized price feeder (admin only)
+   */
+  async setAuthorizedFeeder(adminPrivateKey, account, authorized) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const adminWallet = this.createWalletFromPrivateKey(adminPrivateKey);
+    const oracleWithAdmin = this.priceOracle.connect(adminWallet);
+    
+    const tx = await oracleWithAdmin.setAuthorizedFeeder(account, authorized);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      account,
+      authorized,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Get oracle admin address
+   */
+  async getOracleAdmin() {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const admin = await this.priceOracle.admin();
+    return admin;
+  }
+
+  /**
+   * Transfer oracle admin role
+   */
+  async transferOracleAdmin(adminPrivateKey, newAdmin) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const adminWallet = this.createWalletFromPrivateKey(adminPrivateKey);
+    const oracleWithAdmin = this.priceOracle.connect(adminWallet);
+    
+    const oldAdmin = await this.priceOracle.admin();
+    const tx = await oracleWithAdmin.setAdmin(newAdmin);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      oldAdmin,
+      newAdmin,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Get oracle configuration
+   */
+  async getOracleConfig() {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const [defaultFee, defaultTickSpacing, maxPriceAge, twapWindow, admin] = await Promise.all([
+      this.priceOracle.defaultFee(),
+      this.priceOracle.defaultTickSpacing(),
+      this.priceOracle.MAX_PRICE_AGE(),
+      this.priceOracle.TWAP_WINDOW(),
+      this.priceOracle.admin()
+    ]);
+    
+    return {
+      defaultFee: defaultFee.toString(),
+      defaultTickSpacing: defaultTickSpacing.toString(),
+      maxPriceAge: maxPriceAge.toString(),
+      twapWindow: twapWindow.toString(),
+      admin
+    };
+  }
+
+  /**
+   * Set default fee for pool lookups (admin only)
+   */
+  async setDefaultFee(adminPrivateKey, fee) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const adminWallet = this.createWalletFromPrivateKey(adminPrivateKey);
+    const oracleWithAdmin = this.priceOracle.connect(adminWallet);
+    
+    const tx = await oracleWithAdmin.setDefaultFee(fee);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      fee,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Set default tick spacing for pool lookups (admin only)
+   */
+  async setDefaultTickSpacing(adminPrivateKey, tickSpacing) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const adminWallet = this.createWalletFromPrivateKey(adminPrivateKey);
+    const oracleWithAdmin = this.priceOracle.connect(adminWallet);
+    
+    const tx = await oracleWithAdmin.setDefaultTickSpacing(tickSpacing);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      tickSpacing,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Invalidate external price feed (admin/authorized only)
+   */
+  async invalidatePrice(feederPrivateKey, token0, token1) {
+    if (!this.priceOracle) {
+      throw new Error('PriceOracle not initialized');
+    }
+    
+    const feederWallet = this.createWalletFromPrivateKey(feederPrivateKey);
+    const oracleWithFeeder = this.priceOracle.connect(feederWallet);
+    
+    const tx = await oracleWithFeeder.invalidatePrice(token0, token1);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      token0,
+      token1,
       gasUsed: receipt.gasUsed.toString()
     };
   }
