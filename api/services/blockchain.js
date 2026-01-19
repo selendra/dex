@@ -1544,6 +1544,145 @@ class BlockchainService {
       lpFeePercent: (Number(lpFee) / 10000).toFixed(4) + '%'
     };
   }
+
+  /**
+   * Get LP position info for a pool
+   * In V4, positions are owned by the LiquidityManager contract
+   * @param {string} token0 - First token address
+   * @param {string} token1 - Second token address
+   * @param {number} fee - Pool fee tier
+   * @param {number} tickLower - Lower tick (optional, defaults to full range)
+   * @param {number} tickUpper - Upper tick (optional, defaults to full range)
+   */
+  async getLPPositionInfo(token0, token1, fee = 3000, tickLower = null, tickUpper = null) {
+    const [sortedToken0, sortedToken1] = token0.toLowerCase() < token1.toLowerCase() 
+      ? [token0, token1] 
+      : [token1, token0];
+    
+    const tickSpacing = this.getTickSpacingForFee(fee);
+    const poolKey = {
+      currency0: sortedToken0,
+      currency1: sortedToken1,
+      fee: fee,
+      tickSpacing: tickSpacing,
+      hooks: ethers.ZeroAddress
+    };
+    
+    const poolId = this.calculatePoolId(poolKey);
+    
+    // Use full range if not specified
+    const lower = tickLower !== null ? tickLower : this.MIN_TICK;
+    const upper = tickUpper !== null ? tickUpper : this.MAX_TICK;
+    
+    // The LiquidityManager contract owns the position
+    const liquidityManagerAddr = await this.liquidityManager.getAddress();
+    
+    try {
+      // Get position info from StateView
+      const [liquidity, feeGrowthInside0LastX128, feeGrowthInside1LastX128] = 
+        await this.stateView.getPositionInfo(
+          poolId,
+          liquidityManagerAddr,
+          lower,
+          upper,
+          ethers.ZeroHash // salt
+        );
+      
+      // Get current fee growth values for the pool
+      const [feeGrowthInside0X128, feeGrowthInside1X128] = 
+        await this.stateView.getFeeGrowthInside(poolId, lower, upper);
+      
+      // Calculate uncollected fees
+      // fees = liquidity * (currentFeeGrowth - lastFeeGrowth) / 2^128
+      const Q128 = BigInt(2) ** BigInt(128);
+      
+      const feeGrowth0Delta = BigInt(feeGrowthInside0X128) - BigInt(feeGrowthInside0LastX128);
+      const feeGrowth1Delta = BigInt(feeGrowthInside1X128) - BigInt(feeGrowthInside1LastX128);
+      
+      const fees0Owed = (BigInt(liquidity) * feeGrowth0Delta) / Q128;
+      const fees1Owed = (BigInt(liquidity) * feeGrowth1Delta) / Q128;
+      
+      return {
+        token0: sortedToken0,
+        token1: sortedToken1,
+        fee,
+        tickLower: lower,
+        tickUpper: upper,
+        poolId,
+        positionOwner: liquidityManagerAddr,
+        liquidity: liquidity.toString(),
+        liquidityFormatted: ethers.formatEther(liquidity),
+        feeGrowthInside0LastX128: feeGrowthInside0LastX128.toString(),
+        feeGrowthInside1LastX128: feeGrowthInside1LastX128.toString(),
+        currentFeeGrowth0X128: feeGrowthInside0X128.toString(),
+        currentFeeGrowth1X128: feeGrowthInside1X128.toString(),
+        fees0Owed: fees0Owed.toString(),
+        fees1Owed: fees1Owed.toString(),
+        fees0OwedFormatted: ethers.formatEther(fees0Owed),
+        fees1OwedFormatted: ethers.formatEther(fees1Owed)
+      };
+    } catch (error) {
+      console.error('Error getting position info:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Collect LP fees by calling modifyLiquidity with 0 delta
+   * This triggers fee collection without adding/removing liquidity
+   * @param {string} privateKey - User's private key
+   * @param {string} token0 - First token address
+   * @param {string} token1 - Second token address
+   * @param {number} fee - Pool fee tier
+   * @param {number} tickLower - Lower tick (optional)
+   * @param {number} tickUpper - Upper tick (optional)
+   */
+  async collectLPFees(privateKey, token0, token1, fee = 3000, tickLower = null, tickUpper = null) {
+    const wallet = this.createWalletFromPrivateKey(privateKey);
+    const liquidityManagerWithSigner = this.liquidityManager.connect(wallet);
+    
+    const [sortedToken0, sortedToken1] = token0.toLowerCase() < token1.toLowerCase() 
+      ? [token0, token1] 
+      : [token1, token0];
+    
+    const tickSpacing = this.getTickSpacingForFee(fee);
+    const poolKey = {
+      currency0: sortedToken0,
+      currency1: sortedToken1,
+      fee: fee,
+      tickSpacing: tickSpacing,
+      hooks: ethers.ZeroAddress
+    };
+    
+    const lower = tickLower !== null ? tickLower : this.MIN_TICK;
+    const upper = tickUpper !== null ? tickUpper : this.MAX_TICK;
+    
+    // Get fees before collection
+    const positionBefore = await this.getLPPositionInfo(token0, token1, fee, lower, upper);
+    
+    // Call modifyLiquidity with 0 delta to collect fees
+    const tx = await liquidityManagerWithSigner.addLiquidity(
+      poolKey,
+      lower,
+      upper,
+      0 // Zero delta triggers fee collection
+    );
+    const receipt = await tx.wait();
+    
+    // Get position after to calculate collected fees
+    const positionAfter = await this.getLPPositionInfo(token0, token1, fee, lower, upper);
+    
+    return {
+      txHash: tx.hash,
+      poolKey,
+      tickLower: lower,
+      tickUpper: upper,
+      fees0Collected: positionBefore.fees0OwedFormatted,
+      fees1Collected: positionBefore.fees1OwedFormatted,
+      gasUsed: receipt.gasUsed.toString(),
+      collector: wallet.address
+    };
+  }
 }
 
 module.exports = new BlockchainService();

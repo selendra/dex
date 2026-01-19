@@ -119,4 +119,74 @@ router.get('/:token0/:token1', async (req, res, next) => {
   }
 });
 
+/**
+ * GET /api/liquidity/position/:token0/:token1
+ * Get LP position info including uncollected fees
+ */
+router.get('/position/:token0/:token1', async (req, res, next) => {
+  try {
+    const { token0, token1 } = req.params;
+    const fee = parseInt(req.query.fee) || 3000;
+    const tickLower = req.query.tickLower ? parseInt(req.query.tickLower) : null;
+    const tickUpper = req.query.tickUpper ? parseInt(req.query.tickUpper) : null;
+    
+    const positionInfo = await blockchainService.getLPPositionInfo(
+      token0, 
+      token1, 
+      fee, 
+      tickLower, 
+      tickUpper
+    );
+    
+    res.json({
+      success: true,
+      data: positionInfo
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/liquidity/collect-fees
+ * Collect LP fees for a position without removing liquidity
+ * Body: {
+ *   token0: "0x...",
+ *   token1: "0x...",
+ *   privateKey: "0x...",
+ *   fee: 3000 (optional),
+ *   tickLower: -887220 (optional),
+ *   tickUpper: 887220 (optional)
+ * }
+ */
+router.post('/collect-fees', async (req, res, next) => {
+  try {
+    const { token0, token1, privateKey, fee, tickLower, tickUpper } = req.body;
+    
+    if (!token0 || !token1 || !privateKey) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['token0', 'token1', 'privateKey']
+      });
+    }
+    
+    const result = await blockchainService.collectLPFees(
+      privateKey,
+      token0,
+      token1,
+      fee || 3000,
+      tickLower || null,
+      tickUpper || null
+    );
+    
+    res.json({
+      success: true,
+      message: 'LP fees collected successfully',
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;
