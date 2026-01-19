@@ -17,7 +17,15 @@ class BlockchainService {
     this.MIN_TICK = -887220;
     this.MAX_TICK = 887220;
     this.FEE_MEDIUM = 3000;
-    this.TICK_SPACING_MEDIUM = 1;  // V4 uses 1 for flexibility
+    this.TICK_SPACING_MEDIUM = 60;  // Standard for 0.3% fee tier
+    
+    // Fee tier to tick spacing mapping (Uniswap V4 standard)
+    this.FEE_TICK_SPACING = {
+      100: 1,     // 0.01% fee -> tick spacing 1
+      500: 10,    // 0.05% fee -> tick spacing 10
+      3000: 60,   // 0.30% fee -> tick spacing 60
+      10000: 200  // 1.00% fee -> tick spacing 200
+    };
     
     // Price limits for swaps (within valid range)
     // MIN_SQRT_PRICE = 4295128739 + 1
@@ -371,13 +379,23 @@ class BlockchainService {
       : [token1Addr, token0Addr];
   }
 
+  /**
+   * Get tick spacing for a fee tier
+   * @param {number} fee - Fee in basis points (100, 500, 3000, 10000)
+   * @returns {number} Tick spacing
+   */
+  getTickSpacingForFee(fee) {
+    return this.FEE_TICK_SPACING[fee] || this.TICK_SPACING_MEDIUM;
+  }
+
   createPoolKey(token0Addr, token1Addr, fee = null, tickSpacing = null) {
     const [c0, c1] = this.sortTokens(token0Addr, token1Addr);
+    const poolFee = fee || this.FEE_MEDIUM;
     return {
       currency0: c0,
       currency1: c1,
-      fee: fee || this.FEE_MEDIUM,
-      tickSpacing: tickSpacing || this.TICK_SPACING_MEDIUM,
+      fee: poolFee,
+      tickSpacing: tickSpacing || this.getTickSpacingForFee(poolFee),
       hooks: ethers.ZeroAddress
     };
   }
@@ -1347,6 +1365,183 @@ class BlockchainService {
       token0,
       token1,
       gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  // ========== Protocol Fee Management (PoolManager Owner Functions) ==========
+
+  /**
+   * Get protocol fee controller address
+   */
+  async getProtocolFeeController() {
+    const controller = await this.poolManager.protocolFeeController();
+    const owner = await this.poolManager.owner();
+    return {
+      protocolFeeController: controller,
+      poolManagerOwner: owner
+    };
+  }
+
+  /**
+   * Get accrued protocol fees for a token
+   * @param {string} tokenAddress - Token address to check fees for
+   */
+  async getProtocolFeesAccrued(tokenAddress) {
+    const fees = await this.poolManager.protocolFeesAccrued(tokenAddress);
+    return {
+      tokenAddress,
+      feesAccrued: fees.toString(),
+      feesFormatted: ethers.formatUnits(fees, 18)
+    };
+  }
+
+  /**
+   * Set protocol fee controller (only PoolManager owner)
+   * @param {string} privateKey - Owner's private key
+   * @param {string} controllerAddress - New fee controller address
+   */
+  async setProtocolFeeController(privateKey, controllerAddress) {
+    const wallet = this.createWalletFromPrivateKey(privateKey);
+    const poolManagerWithOwner = this.poolManager.connect(wallet);
+    
+    const tx = await poolManagerWithOwner.setProtocolFeeController(controllerAddress);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      newController: controllerAddress,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Set protocol fee for a specific pool (only protocol fee controller)
+   * @param {string} privateKey - Fee controller's private key
+   * @param {string} token0 - First token address
+   * @param {string} token1 - Second token address
+   * @param {number} fee - Pool fee tier (e.g., 3000)
+   * @param {number} protocolFee - Protocol fee (0-1000 for each direction, max 0.1%)
+   *                               Pass single value for both directions or object {zeroForOne, oneForZero}
+   */
+  async setProtocolFee(privateKey, token0, token1, fee, protocolFee) {
+    const wallet = this.createWalletFromPrivateKey(privateKey);
+    const poolManagerWithController = this.poolManager.connect(wallet);
+    
+    // Sort tokens
+    const [sortedToken0, sortedToken1] = token0.toLowerCase() < token1.toLowerCase() 
+      ? [token0, token1] 
+      : [token1, token0];
+    
+    // Use correct tick spacing for fee tier
+    const tickSpacing = this.getTickSpacingForFee(fee);
+    
+    const poolKey = {
+      currency0: sortedToken0,
+      currency1: sortedToken1,
+      fee: fee,
+      tickSpacing: tickSpacing,
+      hooks: ethers.ZeroAddress
+    };
+    
+    // Encode protocol fee: lower 12 bits for zeroForOne, upper 12 bits for oneForZero
+    // Max value for each is 1000 (0.1%)
+    let encodedFee;
+    if (typeof protocolFee === 'object') {
+      const zeroForOneFee = Math.min(protocolFee.zeroForOne || 0, 1000);
+      const oneForZeroFee = Math.min(protocolFee.oneForZero || 0, 1000);
+      encodedFee = zeroForOneFee | (oneForZeroFee << 12);
+    } else {
+      // Same fee for both directions
+      const feeValue = Math.min(protocolFee, 1000);
+      encodedFee = feeValue | (feeValue << 12);
+    }
+    
+    const tx = await poolManagerWithController.setProtocolFee(poolKey, encodedFee);
+    const receipt = await tx.wait();
+    
+    return {
+      txHash: tx.hash,
+      poolKey,
+      protocolFee: encodedFee,
+      zeroForOneFee: encodedFee & 0xFFF,
+      oneForZeroFee: (encodedFee >> 12) & 0xFFF,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Collect accrued protocol fees (only protocol fee controller)
+   * @param {string} privateKey - Fee controller's private key
+   * @param {string} recipient - Address to receive fees
+   * @param {string} tokenAddress - Token address to collect fees for
+   * @param {string} amount - Amount to collect (0 = all)
+   */
+  async collectProtocolFees(privateKey, recipient, tokenAddress, amount = "0") {
+    const wallet = this.createWalletFromPrivateKey(privateKey);
+    const poolManagerWithController = this.poolManager.connect(wallet);
+    
+    // Get current accrued fees
+    const accruedBefore = await this.poolManager.protocolFeesAccrued(tokenAddress);
+    
+    const amountToCollect = amount === "0" ? 0 : ethers.parseUnits(amount, 18);
+    
+    const tx = await poolManagerWithController.collectProtocolFees(recipient, tokenAddress, amountToCollect);
+    const receipt = await tx.wait();
+    
+    // Get remaining fees
+    const accruedAfter = await this.poolManager.protocolFeesAccrued(tokenAddress);
+    
+    return {
+      txHash: tx.hash,
+      recipient,
+      tokenAddress,
+      amountCollected: ethers.formatUnits(accruedBefore - accruedAfter, 18),
+      remainingFees: ethers.formatUnits(accruedAfter, 18),
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Get protocol fee info for a pool
+   * @param {string} token0 - First token address
+   * @param {string} token1 - Second token address
+   * @param {number} fee - Pool fee tier
+   */
+  async getPoolProtocolFee(token0, token1, fee = 3000) {
+    // Sort tokens
+    const [sortedToken0, sortedToken1] = token0.toLowerCase() < token1.toLowerCase() 
+      ? [token0, token1] 
+      : [token1, token0];
+    
+    // Create pool key and calculate pool ID
+    const tickSpacing = this.getTickSpacingForFee(fee);
+    const poolKey = {
+      currency0: sortedToken0,
+      currency1: sortedToken1,
+      fee: fee,
+      tickSpacing: tickSpacing,
+      hooks: ethers.ZeroAddress
+    };
+    
+    const poolId = this.calculatePoolId(poolKey);
+    
+    // Get slot0 from StateView using poolId
+    const [sqrtPriceX96, tick, protocolFee, lpFee] = await this.stateView.getSlot0(poolId);
+    
+    return {
+      token0: sortedToken0,
+      token1: sortedToken1,
+      fee,
+      tickSpacing,
+      poolId,
+      sqrtPriceX96: sqrtPriceX96.toString(),
+      tick: tick.toString(),
+      protocolFee: protocolFee.toString(),
+      lpFee: lpFee.toString(),
+      // Decode protocol fee (lower 12 bits = zeroForOne, upper 12 bits = oneForZero)
+      protocolFeeZeroForOne: (Number(protocolFee) & 0xFFF).toString(),
+      protocolFeeOneForZero: ((Number(protocolFee) >> 12) & 0xFFF).toString(),
+      lpFeePercent: (Number(lpFee) / 10000).toFixed(4) + '%'
     };
   }
 }

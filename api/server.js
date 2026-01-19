@@ -6,6 +6,7 @@ const liquidityRoutes = require('./routes/liquidity');
 const poolRoutes = require('./routes/pool');
 const tokenRoutes = require('./routes/token');
 const oracleRoutes = require('./routes/oracle');
+const protocolFeesRoutes = require('./routes/protocol-fees');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +22,7 @@ app.use('/api/liquidity', liquidityRoutes);
 app.use('/api/pool', poolRoutes);
 app.use('/api/token', tokenRoutes);
 app.use('/api/oracle', oracleRoutes);
+app.use('/api/protocol-fees', protocolFeesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
