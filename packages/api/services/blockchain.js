@@ -1,7 +1,18 @@
 const ethers = require('ethers');
-const fs = require('fs');
 const path = require('path');
-require('dotenv').config();
+
+// Load .env from project root
+require('dotenv').config({ path: path.join(__dirname, '../../../.env') });
+
+// Load custom ABIs (standalone, no dependency on contracts package)
+const {
+  PoolManagerABI,
+  StateViewABI,
+  LiquidityManagerABI,
+  SwapRouterABI,
+  PriceOracleABI,
+  ERC20ABI
+} = require('../abi');
 
 class BlockchainService {
   constructor() {
@@ -65,37 +76,15 @@ class BlockchainService {
         throw new Error('Missing Selendra contract addresses in .env file.');
       }
       
-      // Load ABIs from artifacts
-      const artifactsPath = path.join(__dirname, '../../artifacts/contracts');
-      
-      const poolManagerABI = JSON.parse(
-        fs.readFileSync(path.join(artifactsPath, 'core/PoolManager.sol/PoolManager.json'), 'utf8')
-      ).abi;
-      
-      const stateViewABI = JSON.parse(
-        fs.readFileSync(path.join(artifactsPath, 'periphery/lens/StateView.sol/StateView.json'), 'utf8')
-      ).abi;
-      
-      const liquidityManagerABI = JSON.parse(
-        fs.readFileSync(path.join(artifactsPath, 'LiquidityManager.sol/LiquidityManager.json'), 'utf8')
-      ).abi;
-      
-      const swapRouterABI = JSON.parse(
-        fs.readFileSync(path.join(artifactsPath, 'SwapRouter.sol/SwapRouter.json'), 'utf8')
-      ).abi;
-      
-      // Connect to contracts with signer
-      this.poolManager = new ethers.Contract(poolManagerAddr, poolManagerABI, this.signer);
-      this.stateView = new ethers.Contract(stateViewAddr, stateViewABI, this.signer);
-      this.liquidityManager = new ethers.Contract(liquidityManagerAddr, liquidityManagerABI, this.signer);
-      this.swapRouter = new ethers.Contract(swapRouterAddr, swapRouterABI, this.signer);
+      // Connect to contracts with signer using custom ABIs
+      this.poolManager = new ethers.Contract(poolManagerAddr, PoolManagerABI, this.signer);
+      this.stateView = new ethers.Contract(stateViewAddr, StateViewABI, this.signer);
+      this.liquidityManager = new ethers.Contract(liquidityManagerAddr, LiquidityManagerABI, this.signer);
+      this.swapRouter = new ethers.Contract(swapRouterAddr, SwapRouterABI, this.signer);
       
       // Load PriceOracle if available
       if (priceOracleAddr) {
-        const priceOracleABI = JSON.parse(
-          fs.readFileSync(path.join(artifactsPath, 'PriceOracle.sol/PriceOracle.json'), 'utf8')
-        ).abi;
-        this.priceOracle = new ethers.Contract(priceOracleAddr, priceOracleABI, this.signer);
+        this.priceOracle = new ethers.Contract(priceOracleAddr, PriceOracleABI, this.signer);
         console.log('   PriceOracle:', await this.priceOracle.getAddress());
       }
       
@@ -154,26 +143,9 @@ class BlockchainService {
 
   async loadToken(tokenAddress) {
     if (!this.tokens[tokenAddress]) {
-      const tokenABI = [
-        // View functions
-        'function name() view returns (string)',
-        'function symbol() view returns (string)',
-        'function decimals() view returns (uint8)',
-        'function totalSupply() view returns (uint256)',
-        'function balanceOf(address) view returns (uint256)',
-        'function allowance(address owner, address spender) view returns (uint256)',
-        // State-changing functions
-        'function transfer(address to, uint256 amount) returns (bool)',
-        'function approve(address spender, uint256 amount) returns (bool)',
-        'function transferFrom(address from, address to, uint256 amount) returns (bool)',
-        // TestToken specific functions
-        'function mint(address to, uint256 amount)',
-        'function burn(uint256 amount)',
-        'function burnFrom(address account, uint256 amount)'
-      ];
       this.tokens[tokenAddress] = new ethers.Contract(
         tokenAddress,
-        tokenABI,
+        ERC20ABI,
         this.signer
       );
     }
@@ -184,21 +156,7 @@ class BlockchainService {
    * Load token with a specific wallet (for user operations)
    */
   loadTokenWithWallet(tokenAddress, wallet) {
-    const tokenABI = [
-      'function name() view returns (string)',
-      'function symbol() view returns (string)',
-      'function decimals() view returns (uint8)',
-      'function totalSupply() view returns (uint256)',
-      'function balanceOf(address) view returns (uint256)',
-      'function allowance(address owner, address spender) view returns (uint256)',
-      'function transfer(address to, uint256 amount) returns (bool)',
-      'function approve(address spender, uint256 amount) returns (bool)',
-      'function transferFrom(address from, address to, uint256 amount) returns (bool)',
-      'function mint(address to, uint256 amount)',
-      'function burn(uint256 amount)',
-      'function burnFrom(address account, uint256 amount)'
-    ];
-    return new ethers.Contract(tokenAddress, tokenABI, wallet);
+    return new ethers.Contract(tokenAddress, ERC20ABI, wallet);
   }
 
   /**
@@ -596,17 +554,9 @@ class BlockchainService {
       sortedAmount1 = amount0;
     }
     
-    // ERC20 ABI for transfer
-    const tokenABI = [
-      'function balanceOf(address) view returns (uint256)',
-      'function transfer(address to, uint256 amount) returns (bool)',
-      'function approve(address spender, uint256 amount) returns (bool)',
-      'function allowance(address owner, address spender) view returns (uint256)'
-    ];
-    
-    // Connect tokens to user's wallet
-    const token0 = new ethers.Contract(poolKey.currency0, tokenABI, userWallet);
-    const token1 = new ethers.Contract(poolKey.currency1, tokenABI, userWallet);
+    // Connect tokens to user's wallet using ERC20ABI
+    const token0 = new ethers.Contract(poolKey.currency0, ERC20ABI, userWallet);
+    const token1 = new ethers.Contract(poolKey.currency1, ERC20ABI, userWallet);
     
     // Parse amounts
     const amount0Wei = ethers.parseEther(sortedAmount0.toString());

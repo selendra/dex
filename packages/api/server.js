@@ -1,6 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const path = require('path');
+
+// Load .env from project root
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+
+const blockchainService = require('./services/blockchain');
 const swapRoutes = require('./routes/swap');
 const liquidityRoutes = require('./routes/liquidity');
 const poolRoutes = require('./routes/pool');
@@ -10,6 +16,13 @@ const protocolFeesRoutes = require('./routes/protocol-fees');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Initialize blockchain service on startup
+blockchainService.initialize().then(() => {
+  console.log('✅ Blockchain service ready');
+}).catch(err => {
+  console.error('❌ Failed to initialize blockchain service:', err.message);
+});
 
 // Middleware
 app.use(cors());
