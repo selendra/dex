@@ -54,6 +54,9 @@ contract PriceOracle {
     
     /// @notice Default tick spacing
     int24 public defaultTickSpacing = 1;
+    
+    /// @notice Mapping of stablecoin tokens (always use external price)
+    mapping(address => bool) public stablecoins;
 
     // ========== Structs ==========
     
@@ -84,6 +87,7 @@ contract PriceOracle {
     event PriceUpdated(address indexed token0, address indexed token1, uint256 price, uint256 timestamp);
     event PriceObserved(bytes32 indexed pairHash, uint256 price, uint256 timestamp);
     event DefaultFeeChanged(uint24 oldFee, uint24 newFee);
+    event StablecoinSet(address indexed token, bool isStable);
 
     // ========== Errors ==========
     
@@ -144,6 +148,21 @@ contract PriceOracle {
     /// @param newTickSpacing New default tick spacing
     function setDefaultTickSpacing(int24 newTickSpacing) external onlyAdmin {
         defaultTickSpacing = newTickSpacing;
+    }
+
+    /// @notice Mark a token as stablecoin (always uses external price feed)
+    /// @param token Token address to mark as stablecoin
+    /// @param isStable True to mark as stablecoin, false to unmark
+    function setStablecoin(address token, bool isStable) external onlyAdmin {
+        stablecoins[token] = isStable;
+        emit StablecoinSet(token, isStable);
+    }
+
+    /// @notice Check if a token is marked as stablecoin
+    /// @param token Token address to check
+    /// @return True if token is a stablecoin
+    function isStablecoin(address token) external view returns (bool) {
+        return stablecoins[token];
     }
 
     // ========== Price Feed Functions ==========
@@ -212,7 +231,7 @@ contract PriceOracle {
 
     // ========== Price Query Functions ==========
     
-    /// @notice Get price for a token pair (tries pool first, then external feed)
+    /// @notice Get price for a token pair (stablecoins use external feed, others try pool first)
     /// @param token0 First token address
     /// @param token1 Second token address
     /// @return info Complete price information
@@ -220,7 +239,30 @@ contract PriceOracle {
         (address sortedToken0, address sortedToken1) = _sortTokens(token0, token1);
         bool needsInvert = token0 != sortedToken0;
         
-        // Try to get price from on-chain pool first
+        // Check if either token is a stablecoin - if so, prioritize external price feed
+        bool hasStablecoin = stablecoins[sortedToken0] || stablecoins[sortedToken1];
+        
+        // For stablecoin pairs, try external price first
+        if (hasStablecoin) {
+            PriceData memory data = externalPrices[sortedToken0][sortedToken1];
+            
+            if (data.isValid && data.price > 0) {
+                uint256 finalPrice = needsInvert ? _invertPrice(data.price) : data.price;
+                bytes32 pairHash = _getPairHash(sortedToken0, sortedToken1);
+                uint256 twap = _calculateTWAP(pairHash);
+                bool isStale = block.timestamp - data.timestamp > MAX_PRICE_AGE;
+                
+                return PriceInfo({
+                    price: finalPrice,
+                    twap: needsInvert && twap > 0 ? _invertPrice(twap) : twap,
+                    lastUpdate: data.timestamp,
+                    fromPool: false,
+                    isStale: isStale
+                });
+            }
+        }
+        
+        // Try to get price from on-chain pool
         (bool poolExists, uint256 poolPrice, ) = _getPoolPrice(sortedToken0, sortedToken1);
         
         if (poolExists && poolPrice > 0) {
