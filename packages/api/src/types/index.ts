@@ -75,6 +75,7 @@ export interface LiquidityResult {
   amount1Deposited?: string;
   liquidityRemoved?: string;
   fromWallet?: string;
+  gasUsed?: string;
 }
 
 export interface PositionInfo {

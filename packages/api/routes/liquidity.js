@@ -84,7 +84,8 @@ router.post('/remove', async (req, res, next) => {
       token1,
       parseFloat(liquidityAmount),
       tickLower || null,
-      tickUpper || null
+      tickUpper || null,
+      privateKey
     );
     
     res.json({
@@ -113,6 +114,42 @@ router.get('/:token0/:token1', async (req, res, next) => {
     res.json({
       success: true,
       data: poolInfo
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/liquidity/user-position/:userAddress/:token0/:token1
+ * Get LP position info for a specific user from contract
+ */
+router.get('/user-position/:userAddress/:token0/:token1', async (req, res, next) => {
+  try {
+    const { userAddress, token0, token1 } = req.params;
+    const fee = parseInt(req.query.fee) || 3000;
+    const tickLower = req.query.tickLower ? parseInt(req.query.tickLower) : null;
+    const tickUpper = req.query.tickUpper ? parseInt(req.query.tickUpper) : null;
+    
+    const position = await blockchainService.getPositionFromContract(
+      userAddress,
+      token0,
+      token1,
+      fee,
+      tickLower,
+      tickUpper
+    );
+    
+    res.json({
+      success: true,
+      data: {
+        userAddress,
+        token0,
+        token1,
+        fee,
+        ...position,
+        liquidityFormatted: position.liquidity ? (Number(position.liquidity) / 1e18).toFixed(18) : '0'
+      }
     });
   } catch (error) {
     next(error);

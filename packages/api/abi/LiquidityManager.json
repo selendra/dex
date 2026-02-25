@@ -23,6 +23,88 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "components": [
+          { "internalType": "Currency", "name": "currency0", "type": "address" },
+          { "internalType": "Currency", "name": "currency1", "type": "address" },
+          { "internalType": "uint24", "name": "fee", "type": "uint24" },
+          { "internalType": "int24", "name": "tickSpacing", "type": "int24" },
+          { "internalType": "contract IHooks", "name": "hooks", "type": "address" }
+        ],
+        "internalType": "struct PoolKey",
+        "name": "key",
+        "type": "tuple"
+      },
+      { "internalType": "int24", "name": "tickLower", "type": "int24" },
+      { "internalType": "int24", "name": "tickUpper", "type": "int24" },
+      { "internalType": "uint128", "name": "liquidityDelta", "type": "uint128" }
+    ],
+    "name": "removeLiquidity",
+    "outputs": [{ "internalType": "BalanceDelta", "name": "delta", "type": "int256" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          { "internalType": "Currency", "name": "currency0", "type": "address" },
+          { "internalType": "Currency", "name": "currency1", "type": "address" },
+          { "internalType": "uint24", "name": "fee", "type": "uint24" },
+          { "internalType": "int24", "name": "tickSpacing", "type": "int24" },
+          { "internalType": "contract IHooks", "name": "hooks", "type": "address" }
+        ],
+        "internalType": "struct PoolKey",
+        "name": "key",
+        "type": "tuple"
+      },
+      { "internalType": "int24", "name": "tickLower", "type": "int24" },
+      { "internalType": "int24", "name": "tickUpper", "type": "int24" }
+    ],
+    "name": "collectFees",
+    "outputs": [
+      { "internalType": "uint256", "name": "amount0", "type": "uint256" },
+      { "internalType": "uint256", "name": "amount1", "type": "uint256" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "user", "type": "address" },
+      {
+        "components": [
+          { "internalType": "Currency", "name": "currency0", "type": "address" },
+          { "internalType": "Currency", "name": "currency1", "type": "address" },
+          { "internalType": "uint24", "name": "fee", "type": "uint24" },
+          { "internalType": "int24", "name": "tickSpacing", "type": "int24" },
+          { "internalType": "contract IHooks", "name": "hooks", "type": "address" }
+        ],
+        "internalType": "struct PoolKey",
+        "name": "key",
+        "type": "tuple"
+      },
+      { "internalType": "int24", "name": "tickLower", "type": "int24" },
+      { "internalType": "int24", "name": "tickUpper", "type": "int24" }
+    ],
+    "name": "getPosition",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "uint128", "name": "liquidity", "type": "uint128" },
+          { "internalType": "int24", "name": "tickLower", "type": "int24" },
+          { "internalType": "int24", "name": "tickUpper", "type": "int24" }
+        ],
+        "internalType": "struct LiquidityManager.Position",
+        "name": "position",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "admin",
     "outputs": [{ "internalType": "address", "name": "", "type": "address" }],

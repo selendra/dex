@@ -597,19 +597,59 @@ class BlockchainService {
     };
   }
 
-  async removeLiquidity(token0Addr: string, token1Addr: string, liquidityAmount: number, tickLower: number | null = null, tickUpper: number | null = null): Promise<LiquidityResult> {
+  async removeLiquidity(token0Addr: string, token1Addr: string, liquidityAmount: number, tickLower: number | null = null, tickUpper: number | null = null, privateKey: string | null = null): Promise<LiquidityResult> {
     const poolKey = this.createPoolKey(token0Addr, token1Addr);
+    
+    // Use wallet if provided, otherwise use default signer
+    const liquidityManagerWithSigner = privateKey 
+      ? this.liquidityManager!.connect(this.createWalletFromPrivateKey(privateKey)) as Contract
+      : this.liquidityManager!;
 
-    const liquidityDelta = -ethers.parseEther(liquidityAmount.toString());
-    const tx = await this.liquidityManager!.addLiquidity(
+    const liquidityDelta = ethers.parseEther(liquidityAmount.toString());
+    const tx = await liquidityManagerWithSigner.removeLiquidity(
       poolKey,
       tickLower || this.MIN_TICK,
       tickUpper || this.MAX_TICK,
       liquidityDelta
     );
-    await tx.wait();
+    const receipt: TransactionReceipt = await tx.wait();
 
-    return { poolKey, txHash: tx.hash, liquidityRemoved: liquidityAmount.toString(), liquidityDelta: liquidityDelta.toString() };
+    return { 
+      poolKey, 
+      txHash: tx.hash, 
+      liquidityRemoved: liquidityAmount.toString(), 
+      liquidityDelta: liquidityDelta.toString(),
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Get LP position info from contract
+   */
+  async getPositionFromContract(userAddress: string, token0: string, token1: string, fee: number = 3000, tickLower: number | null = null, tickUpper: number | null = null): Promise<{ liquidity: string; tickLower: number; tickUpper: number }> {
+    const tickSpacing = this.getTickSpacingForFee(fee);
+    const [sortedToken0, sortedToken1] = token0.toLowerCase() < token1.toLowerCase()
+      ? [token0, token1]
+      : [token1, token0];
+      
+    const poolKey: PoolKey = {
+      currency0: sortedToken0,
+      currency1: sortedToken1,
+      fee: fee,
+      tickSpacing: tickSpacing,
+      hooks: ethers.ZeroAddress
+    };
+    
+    const lower = tickLower !== null ? tickLower : this.MIN_TICK;
+    const upper = tickUpper !== null ? tickUpper : this.MAX_TICK;
+    
+    const position = await this.liquidityManager!.getPosition(userAddress, poolKey, lower, upper);
+    
+    return {
+      liquidity: position.liquidity.toString(),
+      tickLower: Number(position.tickLower),
+      tickUpper: Number(position.tickUpper)
+    };
   }
 
   /**
@@ -1411,23 +1451,40 @@ class BlockchainService {
     const lower = tickLower !== null ? tickLower : this.MIN_TICK;
     const upper = tickUpper !== null ? tickUpper : this.MAX_TICK;
 
-    const positionBefore = await this.getLPPositionInfo(token0, token1, fee, lower, upper);
-
-    const tx = await liquidityManagerWithSigner.addLiquidity(
+    // Use new collectFees function that returns actual fees collected
+    const tx = await liquidityManagerWithSigner.collectFees(
       poolKey,
       lower,
-      upper,
-      0
+      upper
     );
     const receipt: TransactionReceipt = await tx.wait();
+    
+    // Parse the returned amounts from transaction logs or receipt
+    // The collectFees function returns (amount0, amount1)
+    let fees0Collected = '0';
+    let fees1Collected = '0';
+    
+    // Try to decode from logs
+    for (const log of receipt.logs) {
+      try {
+        const parsed = this.liquidityManager!.interface.parseLog(log);
+        if (parsed && parsed.name === 'FeesCollected') {
+          fees0Collected = ethers.formatEther(parsed.args.amount0);
+          fees1Collected = ethers.formatEther(parsed.args.amount1);
+          break;
+        }
+      } catch (e) {
+        // Skip logs that don't match
+      }
+    }
 
     return {
       txHash: tx.hash,
       poolKey,
       tickLower: lower,
       tickUpper: upper,
-      fees0Collected: positionBefore.fees0OwedFormatted,
-      fees1Collected: positionBefore.fees1OwedFormatted,
+      fees0Collected,
+      fees1Collected,
       gasUsed: receipt.gasUsed.toString(),
       collector: wallet.address
     };

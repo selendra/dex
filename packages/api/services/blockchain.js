@@ -612,20 +612,59 @@ class BlockchainService {
     };
   }
 
-  async removeLiquidity(token0Addr, token1Addr, liquidityAmount, tickLower = null, tickUpper = null) {
+  async removeLiquidity(token0Addr, token1Addr, liquidityAmount, tickLower = null, tickUpper = null, privateKey = null) {
     const poolKey = this.createPoolKey(token0Addr, token1Addr);
     
-    // Negative liquidity delta means remove
-    const liquidityDelta = -ethers.parseEther(liquidityAmount.toString());
-    const tx = await this.liquidityManager.addLiquidity(
+    // Use wallet if provided, otherwise use default signer
+    const liquidityManagerWithSigner = privateKey 
+      ? this.liquidityManager.connect(this.createWalletFromPrivateKey(privateKey))
+      : this.liquidityManager;
+    
+    const liquidityDelta = ethers.parseEther(liquidityAmount.toString());
+    const tx = await liquidityManagerWithSigner.removeLiquidity(
       poolKey,
       tickLower || this.MIN_TICK,
       tickUpper || this.MAX_TICK,
       liquidityDelta
     );
-    await tx.wait();
+    const receipt = await tx.wait();
     
-    return { poolKey, txHash: tx.hash, liquidityRemoved: liquidityAmount.toString() };
+    return { 
+      poolKey, 
+      txHash: tx.hash, 
+      liquidityRemoved: liquidityAmount.toString(),
+      liquidityDelta: liquidityDelta.toString(),
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+
+  /**
+   * Get LP position info from contract
+   */
+  async getPositionFromContract(userAddress, token0, token1, fee = 3000, tickLower = null, tickUpper = null) {
+    const tickSpacing = this.getTickSpacingForFee(fee);
+    const [sortedToken0, sortedToken1] = token0.toLowerCase() < token1.toLowerCase()
+      ? [token0, token1]
+      : [token1, token0];
+      
+    const poolKey = {
+      currency0: sortedToken0,
+      currency1: sortedToken1,
+      fee: fee,
+      tickSpacing: tickSpacing,
+      hooks: ethers.ZeroAddress
+    };
+    
+    const lower = tickLower !== null ? tickLower : this.MIN_TICK;
+    const upper = tickUpper !== null ? tickUpper : this.MAX_TICK;
+    
+    const position = await this.liquidityManager.getPosition(userAddress, poolKey, lower, upper);
+    
+    return {
+      liquidity: position.liquidity.toString(),
+      tickLower: Number(position.tickLower),
+      tickUpper: Number(position.tickUpper)
+    };
   }
 
   /**
@@ -1607,32 +1646,40 @@ class BlockchainService {
     const lower = tickLower !== null ? tickLower : this.MIN_TICK;
     const upper = tickUpper !== null ? tickUpper : this.MAX_TICK;
     
-    // Get fees before collection
-    const positionBefore = await this.getLPPositionInfo(token0, token1, fee, lower, upper);
-    
-    // Call modifyLiquidity with 0 delta to collect fees
-    const tx = await liquidityManagerWithSigner.addLiquidity(
+    // Use new collectFees function
+    const tx = await liquidityManagerWithSigner.collectFees(
       poolKey,
       lower,
-      upper,
-      0 // Zero delta triggers fee collection
+      upper
     );
     const receipt = await tx.wait();
     
-    // Get position after to calculate collected fees
-    const positionAfter = await this.getLPPositionInfo(token0, token1, fee, lower, upper);
+    // Parse fees from logs
+    let fees0Collected = '0';
+    let fees1Collected = '0';
+    
+    for (const log of receipt.logs) {
+      try {
+        const parsed = this.liquidityManager.interface.parseLog(log);
+        if (parsed && parsed.name === 'FeesCollected') {
+          fees0Collected = ethers.formatEther(parsed.args.amount0);
+          fees1Collected = ethers.formatEther(parsed.args.amount1);
+          break;
+        }
+      } catch (e) {
+        // Skip logs that don't match
+      }
+    }
     
     return {
       txHash: tx.hash,
       poolKey,
       tickLower: lower,
       tickUpper: upper,
-      fees0Collected: positionBefore.fees0OwedFormatted,
-      fees1Collected: positionBefore.fees1OwedFormatted,
+      fees0Collected,
+      fees1Collected,
       gasUsed: receipt.gasUsed.toString(),
       collector: wallet.address
     };
   }
 }
-
-module.exports = new BlockchainService();
