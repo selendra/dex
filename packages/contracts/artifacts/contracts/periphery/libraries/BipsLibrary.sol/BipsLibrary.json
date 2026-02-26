@@ -1,0 +1,16 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "BipsLibrary",
+  "sourceName": "contracts/periphery/libraries/BipsLibrary.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "InvalidBips",
+      "type": "error"
+    }
+  ],
+  "bytecode": "0x6080806040523460175760399081601c823930815050f35b5f80fdfe5f80fdfea2646970667358221220f0f925543d51f31efa48a37e2f9edfc9ddf2265845f2b72786f91f8a59c2733a64736f6c634300081a0033",
+  "deployedBytecode": "0x5f80fdfea2646970667358221220f0f925543d51f31efa48a37e2f9edfc9ddf2265845f2b72786f91f8a59c2733a64736f6c634300081a0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

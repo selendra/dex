@@ -1,0 +1,24 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "BalanceDeltaLibrary",
+  "sourceName": "contracts/core/types/BalanceDelta.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "ZERO_DELTA",
+      "outputs": [
+        {
+          "internalType": "BalanceDelta",
+          "name": "",
+          "type": "int256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60808060405234601757606f9081601c823930815050f35b5f80fdfe60808060405260043610156011575f80fd5b5f3560e01c6391cb4669146023575f80fd5b5f366003190112603557805f60209252f35b5f80fdfea26469706673582212205c1b80b76db839ff039273813dcff2d460df4f8da7764dbf662045bf323f606064736f6c634300081a0033",
+  "deployedBytecode": "0x60808060405260043610156011575f80fd5b5f3560e01c6391cb4669146023575f80fd5b5f366003190112603557805f60209252f35b5f80fdfea26469706673582212205c1b80b76db839ff039273813dcff2d460df4f8da7764dbf662045bf323f606064736f6c634300081a0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

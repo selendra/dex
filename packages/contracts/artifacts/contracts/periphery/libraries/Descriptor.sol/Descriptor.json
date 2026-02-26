@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "Descriptor",
+  "sourceName": "contracts/periphery/libraries/Descriptor.sol",
+  "abi": [],
+  "bytecode": "0x6080806040523460175760399081601c823930815050f35b5f80fdfe5f80fdfea26469706673582212206a0074b046aafa0b215db3312e22cbe1a605db5e7e1fcd771d475866659c038b64736f6c634300081a0033",
+  "deployedBytecode": "0x5f80fdfea26469706673582212206a0074b046aafa0b215db3312e22cbe1a605db5e7e1fcd771d475866659c038b64736f6c634300081a0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

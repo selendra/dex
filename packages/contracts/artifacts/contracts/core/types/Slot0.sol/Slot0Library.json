@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "Slot0Library",
+  "sourceName": "contracts/core/types/Slot0.sol",
+  "abi": [],
+  "bytecode": "0x6080806040523460175760399081601c823930815050f35b5f80fdfe5f80fdfea2646970667358221220405d9f189826ad40de37773e6d2ee83855e4a9d0186f09a746a5e5b52f84118c64736f6c634300081a0033",
+  "deployedBytecode": "0x5f80fdfea2646970667358221220405d9f189826ad40de37773e6d2ee83855e4a9d0186f09a746a5e5b52f84118c64736f6c634300081a0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "LiquidityAmounts",
+  "sourceName": "contracts/periphery/libraries/LiquidityAmounts.sol",
+  "abi": [],
+  "bytecode": "0x6080806040523460175760399081601c823930815050f35b5f80fdfe5f80fdfea2646970667358221220d79c8dd50001a0a9748ed40304c6cac334801cfe4837a1025028c9d9bdc32cb564736f6c634300081a0033",
+  "deployedBytecode": "0x5f80fdfea2646970667358221220d79c8dd50001a0a9748ed40304c6cac334801cfe4837a1025028c9d9bdc32cb564736f6c634300081a0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
