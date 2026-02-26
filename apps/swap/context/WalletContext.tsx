@@ -73,7 +73,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const target = addr || address;
       if (!target || !sdk) return;
       try {
-        const bal = await sdk.getBalance(target);
+        const bal = await sdk.getNativeBalance(target);
         setBalance(bal);
       } catch {
         // silently ignore balance errors

@@ -6,7 +6,26 @@ import { useRouter } from 'next/navigation';
 import type { User } from '@/types/auth';
 import { api } from '@/lib/api';
 import { storage } from '@/lib/storage';
-import { isTokenExpired } from '@orange-wallet/auth';
+
+/**
+ * Check if a JWT token is expired
+ * @param token JWT token string
+ * @returns true if expired or invalid, false otherwise
+ */
+function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+
+    const payload = JSON.parse(atob(parts[1]));
+    if (!payload.exp) return false;
+
+    // Check if expired (with 30 second buffer)
+    return Date.now() >= (payload.exp * 1000) - 30000;
+  } catch {
+    return true;
+  }
+}
 
 interface AuthContextType {
   user: User | null;

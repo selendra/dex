@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { getNativeBalanceAsNumber } from '@orange-wallet/selendra';
+import { getSDK } from '@/lib/sdk';
 
 interface UseSelBalanceOptions {
   address?: string;
@@ -39,8 +39,9 @@ export function useSelBalance({
     setError(null);
 
     try {
-      const bal = await getNativeBalanceAsNumber(address);
-      setBalance(bal);
+      const sdk = getSDK();
+      const balanceStr = await sdk.getNativeBalance(address);
+      setBalance(parseFloat(balanceStr));
     } catch (err) {
       console.error('Failed to fetch SEL balance:', err);
       setError(err instanceof Error ? err.message : 'Failed to load balance');

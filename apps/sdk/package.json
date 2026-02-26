@@ -1,0 +1,48 @@
+{
+  "name": "@dex/sdk",
+  "version": "1.0.0",
+  "description": "DEX SDK - Direct blockchain interaction for Selendra DEX",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "dex",
+    "selendra",
+    "uniswap",
+    "v4",
+    "sdk",
+    "swap",
+    "liquidity"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "^6.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "dotenv": "^16.3.1",
+    "tsup": "^8.0.1",
+    "typescript": "^5.7.2"
+  },
+  "peerDependencies": {
+    "ethers": "^6.0.0"
+  }
+}
