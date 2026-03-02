@@ -1683,3 +1683,6 @@ class BlockchainService {
     };
   }
 }
+
+// Export singleton instance
+module.exports = new BlockchainService();
