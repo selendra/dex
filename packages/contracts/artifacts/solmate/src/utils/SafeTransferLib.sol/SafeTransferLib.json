@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "SafeTransferLib",
+  "sourceName": "solmate/src/utils/SafeTransferLib.sol",
+  "abi": [],
+  "bytecode": "0x6080806040523460175760399081601c823930815050f35b5f80fdfe5f80fdfea264697066735822122078ce29651b847cb09c7f0f0a60ca48720bb543733357de10d1f91f5e20b260fd64736f6c634300081a0033",
+  "deployedBytecode": "0x5f80fdfea264697066735822122078ce29651b847cb09c7f0f0a60ca48720bb543733357de10d1f91f5e20b260fd64736f6c634300081a0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

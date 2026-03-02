@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "PathKeyLibrary",
+  "sourceName": "contracts/periphery/libraries/PathKey.sol",
+  "abi": [],
+  "bytecode": "0x6080806040523460175760399081601c823930815050f35b5f80fdfe5f80fdfea264697066735822122060dced2124706df95b3cf7a1dfb320d445353f28c95e7e5b0c0283aaf46330aa64736f6c634300081a0033",
+  "deployedBytecode": "0x5f80fdfea264697066735822122060dced2124706df95b3cf7a1dfb320d445353f28c95e7e5b0c0283aaf46330aa64736f6c634300081a0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

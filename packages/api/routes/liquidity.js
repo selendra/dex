@@ -1,0 +1,229 @@
+const express = require('express');
+const router = express.Router();
+const blockchainService = require('../services/blockchain');
+
+/**
+ * POST /api/liquidity/add
+ * Add liquidity to a pool
+ * Body: {
+ *   token0: "0x...",
+ *   token1: "0x...",
+ *   amount0: "1000",
+ *   amount1: "1000",
+ *   privateKey: "0x...",
+ *   tickLower: -887220 (optional),
+ *   tickUpper: 887220 (optional)
+ * }
+ */
+router.post('/add', async (req, res, next) => {
+  try {
+    const { token0, token1, amount0, amount1, privateKey, tickLower, tickUpper } = req.body;
+    
+    // Validate input
+    if (!token0 || !token1 || !amount0 || !amount1 || !privateKey) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['token0', 'token1', 'amount0', 'amount1', 'privateKey']
+      });
+    }
+    
+    // Create wallet from private key
+    const userWallet = blockchainService.createWalletFromPrivateKey(privateKey);
+    
+    // Add liquidity using user's wallet
+    const result = await blockchainService.addLiquidityWithWallet(
+      userWallet,
+      token0,
+      token1,
+      parseFloat(amount0),
+      parseFloat(amount1),
+      tickLower || null,
+      tickUpper || null
+    );
+    
+    res.json({
+      success: true,
+      message: 'Liquidity added successfully',
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/liquidity/remove
+ * Remove liquidity from a pool
+ * Body: {
+ *   token0: "0x...",
+ *   token1: "0x...",
+ *   liquidityAmount: "500",
+ *   privateKey: "0x...",
+ *   tickLower: -887220 (optional),
+ *   tickUpper: 887220 (optional)
+ * }
+ */
+router.post('/remove', async (req, res, next) => {
+  try {
+    const { token0, token1, liquidityAmount, privateKey, tickLower, tickUpper } = req.body;
+    
+    // Validate input
+    if (!token0 || !token1 || !liquidityAmount || !privateKey) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['token0', 'token1', 'liquidityAmount', 'privateKey']
+      });
+    }
+    
+    // Create wallet from private key (for future use if needed)
+    const userWallet = blockchainService.createWalletFromPrivateKey(privateKey);
+    
+    // Remove liquidity
+    const result = await blockchainService.removeLiquidity(
+      token0,
+      token1,
+      parseFloat(liquidityAmount),
+      tickLower || null,
+      tickUpper || null,
+      privateKey
+    );
+    
+    res.json({
+      success: true,
+      message: 'Liquidity removed successfully',
+      data: {
+        ...result,
+        caller: userWallet.address
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/liquidity/:token0/:token1
+ * Get liquidity information for a specific pool
+ */
+router.get('/:token0/:token1', async (req, res, next) => {
+  try {
+    const { token0, token1 } = req.params;
+    
+    const poolInfo = await blockchainService.getPoolInfo(token0, token1);
+    
+    res.json({
+      success: true,
+      data: poolInfo
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/liquidity/user-position/:userAddress/:token0/:token1
+ * Get LP position info for a specific user from contract
+ */
+router.get('/user-position/:userAddress/:token0/:token1', async (req, res, next) => {
+  try {
+    const { userAddress, token0, token1 } = req.params;
+    const fee = parseInt(req.query.fee) || 3000;
+    const tickLower = req.query.tickLower ? parseInt(req.query.tickLower) : null;
+    const tickUpper = req.query.tickUpper ? parseInt(req.query.tickUpper) : null;
+    
+    const position = await blockchainService.getPositionFromContract(
+      userAddress,
+      token0,
+      token1,
+      fee,
+      tickLower,
+      tickUpper
+    );
+    
+    res.json({
+      success: true,
+      data: {
+        userAddress,
+        token0,
+        token1,
+        fee,
+        ...position,
+        liquidityFormatted: position.liquidity ? (Number(position.liquidity) / 1e18).toFixed(18) : '0'
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/liquidity/position/:token0/:token1
+ * Get LP position info including uncollected fees
+ */
+router.get('/position/:token0/:token1', async (req, res, next) => {
+  try {
+    const { token0, token1 } = req.params;
+    const fee = parseInt(req.query.fee) || 3000;
+    const tickLower = req.query.tickLower ? parseInt(req.query.tickLower) : null;
+    const tickUpper = req.query.tickUpper ? parseInt(req.query.tickUpper) : null;
+    
+    const positionInfo = await blockchainService.getLPPositionInfo(
+      token0, 
+      token1, 
+      fee, 
+      tickLower, 
+      tickUpper
+    );
+    
+    res.json({
+      success: true,
+      data: positionInfo
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/liquidity/collect-fees
+ * Collect LP fees for a position without removing liquidity
+ * Body: {
+ *   token0: "0x...",
+ *   token1: "0x...",
+ *   privateKey: "0x...",
+ *   fee: 3000 (optional),
+ *   tickLower: -887220 (optional),
+ *   tickUpper: 887220 (optional)
+ * }
+ */
+router.post('/collect-fees', async (req, res, next) => {
+  try {
+    const { token0, token1, privateKey, fee, tickLower, tickUpper } = req.body;
+    
+    if (!token0 || !token1 || !privateKey) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['token0', 'token1', 'privateKey']
+      });
+    }
+    
+    const result = await blockchainService.collectLPFees(
+      privateKey,
+      token0,
+      token1,
+      fee || 3000,
+      tickLower || null,
+      tickUpper || null
+    );
+    
+    res.json({
+      success: true,
+      message: 'LP fees collected successfully',
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+module.exports = router;

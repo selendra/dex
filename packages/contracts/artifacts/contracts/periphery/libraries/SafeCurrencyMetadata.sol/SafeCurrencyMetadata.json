@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "SafeCurrencyMetadata",
+  "sourceName": "contracts/periphery/libraries/SafeCurrencyMetadata.sol",
+  "abi": [],
+  "bytecode": "0x6080806040523460175760399081601c823930815050f35b5f80fdfe5f80fdfea264697066735822122055cb2c841d4ff45c6f8d4f531984ea68465ebc0495afa9cb32050bc4fca7ffce64736f6c634300081a0033",
+  "deployedBytecode": "0x5f80fdfea264697066735822122055cb2c841d4ff45c6f8d4f531984ea68465ebc0495afa9cb32050bc4fca7ffce64736f6c634300081a0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

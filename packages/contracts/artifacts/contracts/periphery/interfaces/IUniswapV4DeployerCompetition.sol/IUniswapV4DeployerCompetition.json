@@ -1,0 +1,157 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IUniswapV4DeployerCompetition",
+  "sourceName": "contracts/periphery/interfaces/IUniswapV4DeployerCompetition.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "currentTime",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "deadline",
+          "type": "uint256"
+        }
+      ],
+      "name": "CompetitionNotOver",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "currentTime",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "deadline",
+          "type": "uint256"
+        }
+      ],
+      "name": "CompetitionOver",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidBytecode",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "salt",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        }
+      ],
+      "name": "InvalidSender",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "deployer",
+          "type": "address"
+        }
+      ],
+      "name": "NotAllowedToDeploy",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "bestAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "newScore",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "bestScore",
+          "type": "uint256"
+        }
+      ],
+      "name": "WorseAddress",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "bestAddress",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "submitter",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "score",
+          "type": "uint256"
+        }
+      ],
+      "name": "NewAddressFound",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "bytecode",
+          "type": "bytes"
+        }
+      ],
+      "name": "deploy",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "salt",
+          "type": "bytes32"
+        }
+      ],
+      "name": "updateBestAddress",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
