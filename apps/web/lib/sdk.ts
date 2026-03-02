@@ -115,6 +115,7 @@ const POOL_MANAGER_ABI = [
   'function setProtocolFeeController(address controller)',
   'function setProtocolFee((address,address,uint24,int24,address) key, uint24 newProtocolFee)',
   'function collectProtocolFees(address recipient, address currency, uint256 amount) returns (uint256)',
+  'function protocolFeesAccrued(address currency) view returns (uint256)',
 ];
 
 const STATE_VIEW_ABI = [
@@ -820,6 +821,28 @@ class ProtocolFeesModule {
     const receipt = await tx.wait();
 
     return { hash: receipt.hash, block: receipt.blockNumber };
+  }
+
+  async getFeesAccrued(tokenAddress: string): Promise<{
+    tokenAddress: string;
+    feesAccrued: string;
+    feesFormatted: string;
+  }> {
+    if (!this.poolManager) {
+      throw new Error('PoolManager contract not configured');
+    }
+
+    const fees = await this.poolManager.protocolFeesAccrued(tokenAddress);
+
+    return {
+      tokenAddress,
+      feesAccrued: fees.toString(),
+      feesFormatted: ethers.formatUnits(fees, 18),
+    };
+  }
+
+  isConfigured(): boolean {
+    return !!this.poolManager;
   }
 }
 

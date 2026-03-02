@@ -19,6 +19,8 @@ export function SwapHeader() {
   const navLinks = [
     { href: '/', label: 'Swap' },
     { href: '/pool', label: 'Pool' },
+    { href: '/oracle', label: 'Oracle' },
+    { href: '/fees', label: 'Fees' },
   ];
 
   return (
