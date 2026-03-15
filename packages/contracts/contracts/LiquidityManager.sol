@@ -8,19 +8,19 @@ import {Currency} from "./core/types/Currency.sol";
 import {BalanceDelta} from "./core/types/BalanceDelta.sol";
 import {ModifyLiquidityParams} from "./core/types/PoolOperation.sol";
 import {IERC20Minimal} from "./core/interfaces/external/IERC20Minimal.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
-/// @title LiquidityManager - Uniswap V4 Liquidity Management with Admin Control
-/// @notice Manages liquidity positions and pool initialization with admin access control
-contract LiquidityManager {
+/// @title LiquidityManager - Uniswap V4 Liquidity Management with Role-Based Access Control
+/// @notice Manages liquidity positions and pool initialization.
+/// @dev Uses OpenZeppelin AccessControl. DEFAULT_ADMIN_ROLE can grant/revoke roles.
+///      INITIALIZER_ROLE is required to initialize new pools.
+contract LiquidityManager is AccessControl {
     using PoolIdLibrary for PoolKey;
 
+    /// @notice Role identifier for accounts allowed to initialize pools
+    bytes32 public constant INITIALIZER_ROLE = keccak256("INITIALIZER_ROLE");
+
     IPoolManager public immutable poolManager;
-    
-    /// @notice Admin address - can initialize pools
-    address public admin;
-    
-    /// @notice Mapping of authorized pool initializers
-    mapping(address => bool) public authorizedInitializers;
     
     /// @notice Track initialized pools
     mapping(PoolId => bool) public initializedPools;
@@ -43,50 +43,20 @@ contract LiquidityManager {
     mapping(address => mapping(PoolId => mapping(bytes32 => Position))) public positions;
 
     /// @notice Events
-    event AdminChanged(address indexed oldAdmin, address indexed newAdmin);
-    event InitializerAuthorized(address indexed account, bool authorized);
     event PoolInitialized(PoolId indexed poolId, address indexed initializer);
     event LiquidityAdded(address indexed provider, PoolId indexed poolId, int24 tickLower, int24 tickUpper, uint128 liquidity);
     event LiquidityRemoved(address indexed provider, PoolId indexed poolId, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 amount0, uint256 amount1);
     event FeesCollected(address indexed provider, PoolId indexed poolId, uint256 amount0, uint256 amount1);
 
     /// @notice Errors
-    error NotAdmin();
-    error NotAuthorized();
     error PoolAlreadyInitialized();
     error InsufficientLiquidity();
     error NoPosition();
 
-    modifier onlyAdmin() {
-        if (msg.sender != admin) revert NotAdmin();
-        _;
-    }
-
-    modifier onlyAuthorized() {
-        if (msg.sender != admin && !authorizedInitializers[msg.sender]) revert NotAuthorized();
-        _;
-    }
-    
     constructor(IPoolManager _poolManager) {
         poolManager = _poolManager;
-        admin = msg.sender;
-        authorizedInitializers[msg.sender] = true;
-    }
-
-    /// @notice Change admin address
-    /// @param newAdmin New admin address
-    function setAdmin(address newAdmin) external onlyAdmin {
-        address oldAdmin = admin;
-        admin = newAdmin;
-        emit AdminChanged(oldAdmin, newAdmin);
-    }
-
-    /// @notice Authorize or revoke an address to initialize pools
-    /// @param account Address to authorize/revoke
-    /// @param authorized True to authorize, false to revoke
-    function setAuthorizedInitializer(address account, bool authorized) external onlyAdmin {
-        authorizedInitializers[account] = authorized;
-        emit InitializerAuthorized(account, authorized);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(INITIALIZER_ROLE, msg.sender);
     }
 
     /// @notice Initialize a new pool - only admin or authorized addresses
@@ -96,7 +66,7 @@ contract LiquidityManager {
     function initializePool(
         PoolKey memory key,
         uint160 sqrtPriceX96
-    ) external onlyAuthorized returns (int24 tick) {
+    ) external onlyRole(INITIALIZER_ROLE) returns (int24 tick) {
         PoolId poolId = key.toId();
         
         if (initializedPools[poolId]) revert PoolAlreadyInitialized();

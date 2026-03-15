@@ -6,11 +6,15 @@ import {PoolKey} from "./core/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "./core/types/PoolId.sol";
 import {Currency} from "./core/types/Currency.sol";
 import {IHooks} from "./core/interfaces/IHooks.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import {IPriceOracle} from "./interfaces/IPriceOracle.sol";
 
 /// @title PriceOracle - Price Feed Oracle for DEX Token Pairs
-/// @notice Provides price feeds for token pairs from both on-chain pools and admin-fed external prices
-/// @dev Supports TWAP calculation and external price feeds for pairs without pools
-contract PriceOracle {
+/// @notice Provides price feeds for token pairs from both on-chain pools and externally-fed prices.
+/// @dev Uses OpenZeppelin AccessControl + ERC-165. DEFAULT_ADMIN_ROLE can grant/revoke roles.
+///      FEEDER_ROLE is required to push external prices. DEFAULT_ADMIN_ROLE manages configuration.
+///      Implements IPriceOracle so OracleRegistry can verify authenticity via supportsInterface.
+contract PriceOracle is AccessControl, IPriceOracle {
     using PoolIdLibrary for PoolKey;
 
     // ========== Constants ==========
@@ -37,11 +41,8 @@ contract PriceOracle {
     
     IPoolManager public immutable poolManager;
     
-    /// @notice Admin address - can feed prices
-    address public admin;
-    
-    /// @notice Mapping of authorized price feeders
-    mapping(address => bool) public authorizedFeeders;
+    /// @notice Role identifier for accounts allowed to feed external prices
+    bytes32 public constant FEEDER_ROLE = keccak256("FEEDER_ROLE");
     
     /// @notice External price feed data for token pairs (token0 => token1 => PriceData)
     mapping(address => mapping(address => PriceData)) public externalPrices;
@@ -72,17 +73,10 @@ contract PriceOracle {
         uint160 sqrtPriceX96;   // Raw sqrtPriceX96 from pool
     }
     
-    struct PriceInfo {
-        uint256 price;          // Current price (18 decimals)
-        uint256 twap;           // Time-weighted average price (18 decimals)
-        uint256 lastUpdate;     // Last update timestamp
-        bool fromPool;          // True if price is from on-chain pool
-        bool isStale;           // True if price is older than MAX_PRICE_AGE
-    }
+    // PriceInfo is defined in IPriceOracle and inherited via the interface.
 
     // ========== Events ==========
     
-    event AdminChanged(address indexed oldAdmin, address indexed newAdmin);
     event FeederAuthorized(address indexed account, bool authorized);
     event PriceUpdated(address indexed token0, address indexed token1, uint256 price, uint256 timestamp);
     event PriceObserved(bytes32 indexed pairHash, uint256 price, uint256 timestamp);
@@ -91,7 +85,6 @@ contract PriceOracle {
 
     // ========== Errors ==========
     
-    error NotAdmin();
     error NotAuthorized();
     error InvalidPrice();
     error InvalidTokenPair();
@@ -99,46 +92,31 @@ contract PriceOracle {
     error StalePrice();
 
     // ========== Modifiers ==========
-    
-    modifier onlyAdmin() {
-        if (msg.sender != admin) revert NotAdmin();
-        _;
-    }
-
-    modifier onlyAuthorized() {
-        if (msg.sender != admin && !authorizedFeeders[msg.sender]) revert NotAuthorized();
-        _;
-    }
 
     // ========== Constructor ==========
     
     constructor(IPoolManager _poolManager) {
         poolManager = _poolManager;
-        admin = msg.sender;
-        authorizedFeeders[msg.sender] = true;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(FEEDER_ROLE, msg.sender);
+    }
+
+    /// @inheritdoc ERC165
+    /// @dev Returns true for IPriceOracle and interfaces inherited from AccessControl / ERC165.
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(AccessControl)
+        returns (bool)
+    {
+        return interfaceId == type(IPriceOracle).interfaceId || super.supportsInterface(interfaceId);
     }
 
     // ========== Admin Functions ==========
     
-    /// @notice Change admin address
-    /// @param newAdmin New admin address
-    function setAdmin(address newAdmin) external onlyAdmin {
-        address oldAdmin = admin;
-        admin = newAdmin;
-        emit AdminChanged(oldAdmin, newAdmin);
-    }
-
-    /// @notice Authorize or revoke a price feeder
-    /// @param account Address to authorize/revoke
-    /// @param authorized True to authorize, false to revoke
-    function setAuthorizedFeeder(address account, bool authorized) external onlyAdmin {
-        authorizedFeeders[account] = authorized;
-        emit FeederAuthorized(account, authorized);
-    }
-
     /// @notice Set default fee tier for pool lookups
     /// @param newFee New default fee (in basis points * 100, e.g., 3000 = 0.3%)
-    function setDefaultFee(uint24 newFee) external onlyAdmin {
+    function setDefaultFee(uint24 newFee) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint24 oldFee = defaultFee;
         defaultFee = newFee;
         emit DefaultFeeChanged(oldFee, newFee);
@@ -146,14 +124,14 @@ contract PriceOracle {
 
     /// @notice Set default tick spacing
     /// @param newTickSpacing New default tick spacing
-    function setDefaultTickSpacing(int24 newTickSpacing) external onlyAdmin {
+    function setDefaultTickSpacing(int24 newTickSpacing) external onlyRole(DEFAULT_ADMIN_ROLE) {
         defaultTickSpacing = newTickSpacing;
     }
 
     /// @notice Mark a token as stablecoin (always uses external price feed)
     /// @param token Token address to mark as stablecoin
     /// @param isStable True to mark as stablecoin, false to unmark
-    function setStablecoin(address token, bool isStable) external onlyAdmin {
+    function setStablecoin(address token, bool isStable) external onlyRole(DEFAULT_ADMIN_ROLE) {
         stablecoins[token] = isStable;
         emit StablecoinSet(token, isStable);
     }
@@ -167,11 +145,11 @@ contract PriceOracle {
 
     // ========== Price Feed Functions ==========
     
-    /// @notice Feed external price for a token pair
+    /// @notice Feed external price for a token pair — requires FEEDER_ROLE
     /// @param token0 First token address
     /// @param token1 Second token address  
     /// @param price Price of token0 in terms of token1 (18 decimal precision)
-    function feedPrice(address token0, address token1, uint256 price) external onlyAuthorized {
+    function feedPrice(address token0, address token1, uint256 price) external onlyRole(FEEDER_ROLE) {
         if (token0 == address(0) || token1 == address(0) || token0 == token1) revert InvalidTokenPair();
         if (price == 0) revert InvalidPrice();
         
@@ -191,7 +169,7 @@ contract PriceOracle {
         emit PriceUpdated(sortedToken0, sortedToken1, sortedPrice, block.timestamp);
     }
 
-    /// @notice Feed multiple prices at once
+    /// @notice Feed multiple prices at once — requires FEEDER_ROLE
     /// @param token0s Array of first token addresses
     /// @param token1s Array of second token addresses
     /// @param prices Array of prices
@@ -199,7 +177,7 @@ contract PriceOracle {
         address[] calldata token0s,
         address[] calldata token1s,
         uint256[] calldata prices
-    ) external onlyAuthorized {
+    ) external onlyRole(FEEDER_ROLE) {
         require(token0s.length == token1s.length && token1s.length == prices.length, "Array length mismatch");
         
         for (uint256 i = 0; i < token0s.length; i++) {
@@ -221,10 +199,10 @@ contract PriceOracle {
         }
     }
 
-    /// @notice Invalidate an external price feed
+    /// @notice Invalidate an external price feed — requires FEEDER_ROLE
     /// @param token0 First token address
     /// @param token1 Second token address
-    function invalidatePrice(address token0, address token1) external onlyAuthorized {
+    function invalidatePrice(address token0, address token1) external onlyRole(FEEDER_ROLE) {
         (address sortedToken0, address sortedToken1) = _sortTokens(token0, token1);
         externalPrices[sortedToken0][sortedToken1].isValid = false;
     }

@@ -3,6 +3,9 @@ apps/*/credentials.json
 apps/*/build
 packages/*/build
 
+artifacts
+cache
+
 # Turborepo
 .turbo
 
