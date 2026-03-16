@@ -33,10 +33,32 @@ async function main() {
   const liquidityManagerAddress = await liquidityManager.getAddress();
   console.log("  ✓ LiquidityManager deployed:", liquidityManagerAddress);
 
-  // Deploy SwapRouter
+  // Deploy OracleRegistry
+  console.log("\n➤ Deploying OracleRegistry...");
+  const OracleRegistry = await hre.ethers.getContractFactory("OracleRegistry");
+  const oracleRegistry = await OracleRegistry.deploy(deployer.address);
+  await oracleRegistry.waitForDeployment();
+  const oracleRegistryAddress = await oracleRegistry.getAddress();
+  console.log("  ✓ OracleRegistry deployed:", oracleRegistryAddress);
+
+  // Deploy PriceOracle
+  console.log("\n➤ Deploying PriceOracle...");
+  const PriceOracle = await hre.ethers.getContractFactory("PriceOracle");
+  const priceOracle = await PriceOracle.deploy(poolManagerAddress);
+  await priceOracle.waitForDeployment();
+  const priceOracleAddress = await priceOracle.getAddress();
+  console.log("  ✓ PriceOracle deployed:", priceOracleAddress);
+
+  // Register PriceOracle with OracleRegistry
+  console.log("\n➤ Registering PriceOracle in OracleRegistry...");
+  const registerTx = await oracleRegistry.registerOracle(priceOracleAddress);
+  await registerTx.wait();
+  console.log("  ✓ PriceOracle registered as active oracle");
+
+  // Deploy SwapRouter (now requires OracleRegistry address)
   console.log("\n➤ Deploying SwapRouter...");
   const SwapRouter = await hre.ethers.getContractFactory("SwapRouter");
-  const swapRouter = await SwapRouter.deploy(poolManagerAddress);
+  const swapRouter = await SwapRouter.deploy(poolManagerAddress, oracleRegistryAddress);
   await swapRouter.waitForDeployment();
   const swapRouterAddress = await swapRouter.getAddress();
   console.log("  ✓ SwapRouter deployed:", swapRouterAddress);
@@ -49,6 +71,8 @@ async function main() {
   console.log(`POOL_MANAGER_ADDRESS=${poolManagerAddress}`);
   console.log(`STATE_VIEW_ADDRESS=${stateViewAddress}`);
   console.log(`LIQUIDITY_ROUTER_ADDRESS=${liquidityManagerAddress}`);
+  console.log(`ORACLE_REGISTRY_ADDRESS=${oracleRegistryAddress}`);
+  console.log(`PRICE_ORACLE_ADDRESS=${priceOracleAddress}`);
   console.log(`SWAP_ROUTER_ADDRESS=${swapRouterAddress}`);
 }
 

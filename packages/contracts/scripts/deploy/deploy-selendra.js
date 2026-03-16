@@ -62,11 +62,51 @@ async function main() {
     process.exit(1);
   }
 
-  // 4. Deploy SwapRouter
+  // 4. Deploy OracleRegistry
+  console.log("\n➤ Deploying OracleRegistry...");
+  try {
+    const OracleRegistry = await hre.ethers.getContractFactory("OracleRegistry");
+    const oracleRegistry = await OracleRegistry.deploy(deployer.address);
+    await oracleRegistry.waitForDeployment();
+    const oracleRegistryAddress = await oracleRegistry.getAddress();
+    console.log(`  ✓ OracleRegistry deployed: ${oracleRegistryAddress}`);
+    deployedContracts.OracleRegistry = oracleRegistryAddress;
+  } catch (error) {
+    console.error("  ✗ OracleRegistry failed:", error.message);
+    process.exit(1);
+  }
+
+  // 5. Deploy PriceOracle
+  console.log("\n➤ Deploying PriceOracle...");
+  try {
+    const PriceOracle = await hre.ethers.getContractFactory("PriceOracle");
+    const priceOracle = await PriceOracle.deploy(deployedContracts.PoolManager);
+    await priceOracle.waitForDeployment();
+    const priceOracleAddress = await priceOracle.getAddress();
+    console.log(`  ✓ PriceOracle deployed: ${priceOracleAddress}`);
+    deployedContracts.PriceOracle = priceOracleAddress;
+  } catch (error) {
+    console.error("  ✗ PriceOracle failed:", error.message);
+    process.exit(1);
+  }
+
+  // Register PriceOracle with OracleRegistry
+  console.log("\n➤ Registering PriceOracle in OracleRegistry...");
+  try {
+    const OracleRegistry = await hre.ethers.getContractAt("OracleRegistry", deployedContracts.OracleRegistry);
+    const registerTx = await OracleRegistry.registerOracle(deployedContracts.PriceOracle);
+    await registerTx.wait();
+    console.log(`  ✓ PriceOracle registered as active oracle`);
+  } catch (error) {
+    console.error("  ✗ Oracle registration failed:", error.message);
+    process.exit(1);
+  }
+
+  // 6. Deploy SwapRouter (requires OracleRegistry address)
   console.log("\n➤ Deploying SwapRouter...");
   try {
     const SwapRouter = await hre.ethers.getContractFactory("SwapRouter");
-    const swapRouter = await SwapRouter.deploy(deployedContracts.PoolManager);
+    const swapRouter = await SwapRouter.deploy(deployedContracts.PoolManager, deployedContracts.OracleRegistry);
     await swapRouter.waitForDeployment();
     const swapRouterAddress = await swapRouter.getAddress();
     console.log(`  ✓ SwapRouter deployed: ${swapRouterAddress}`);
@@ -90,6 +130,8 @@ async function main() {
   console.log(`SELENDRA_POOL_MANAGER_ADDRESS=${deployedContracts.PoolManager}`);
   console.log(`SELENDRA_STATE_VIEW_ADDRESS=${deployedContracts.StateView}`);
   console.log(`SELENDRA_LIQUIDITY_MANAGER_ADDRESS=${deployedContracts.LiquidityManager}`);
+  console.log(`SELENDRA_ORACLE_REGISTRY_ADDRESS=${deployedContracts.OracleRegistry}`);
+  console.log(`SELENDRA_PRICE_ORACLE_ADDRESS=${deployedContracts.PriceOracle}`);
   console.log(`SELENDRA_SWAP_ROUTER_ADDRESS=${deployedContracts.SwapRouter}`);
 
   // Save to JSON
